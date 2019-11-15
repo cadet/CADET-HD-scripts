@@ -1,0 +1,359 @@
+#!/usr/bin/env python3
+
+"""
+@desc:  Tool to prepare 3D chromatography meshes for XNS use.
+        Can handle parallel preparation for small meshes locally. (Large meshes backend untested)
+        Requires gmsh2mixd, shiftmixd, scalemixd, rmmat, gennmat, decompose.metis, and sub.sh
+@auth:  Jayghosh S. Rao
+@usage: ./chrom.py *.msh2 {optional: -e <execstring>}
+"""
+
+import re
+import sys
+import json
+import shutil
+import argparse
+import subprocess
+
+from pathlib import Path
+from os import environ, chdir
+from tempfile import NamedTemporaryFile
+from multiprocessing import Pool, current_process
+
+
+# DONE: refactor all os.path -> pathlib
+# DONE: keep xns.mass.in and xns.flow.in in root, and copy these to the appropriate subdirs.
+# DONE: shutil copy and move and makedir fails if dir exists
+# DONE: Verbose option: Write output to log
+# DONE: Parallelize: multiple FILES: ensure mshfile, dir is passed
+# DONE: check if srun produces stderr
+# DONE: Allow resuming execution order
+# DONE: individual threads log to file
+# DONE: setup setstage on mass templates
+# DONE: Easy re-submit when xns.in needs changing
+# TODO: Make idempotent: if results of current step exists, don't do the current step.
+# TODO: phase out sub.sh
+# TODO: Easy xns.in edits: use config?
+# TODO: On JURECA: devel salloc has limit of 2 hours. If mesh is larger, multiple meshes can't be done together. TODO: backend decompose is not perfect with multi: srun produced error. temp fixed
+# TODO: Setup to work on IBT servers properly
+# TODO: integrate with mixdtools: extractts etc to enable restart simulations better
+# TODO: Parallelize all dependent tools
+# TODO: meta-wrapper where I can specify a table of data that runs multiple simulations
+# TODO: Parallellize workflow/algorithm: gen_spacetime_mesh -> 1. pf 2. pm
+# TODO: consider more nodes allocated for decompose operation (in case of large meshes)
+# TODO: vipe the config if it doesn't exist
+
+# For use with slurm:
+# $ export PYTHONPATH=${PYTHONPATH}:$LMOD_DIR/../init
+# >>> from env_modules_python import module
+# module('list')
+
+if environ.get('LMOD_DIR'):
+    from env_modules_python import module # pylint: disable=import-error
+
+execstring=None
+CONFIGFILE = 'config.json'
+STAGE = 'Stages/2018a'
+TEMPLATEDIR = Path('~/templates').expanduser()
+config = {}
+LOG_FILE = 'chrom.out'
+ROOT = Path.cwd()
+LOG = ROOT.joinpath(LOG_FILE)
+
+def sed_inplace(filename, pattern, repl):
+    '''
+    Perform the pure-Python equivalent of in-place `sed` substitution: e.g.,
+    `sed -i -e 's/'${pattern}'/'${repl}' "${filename}"`.
+    '''
+    # For efficiency, precompile the passed regular expression.
+    pattern_compiled = re.compile(pattern)
+
+    # For portability, NamedTemporaryFile() defaults to mode "w+b" (i.e., binary
+    # writing with updating). This is usually a good thing. In this case,
+    # however, binary writing imposes non-trivial encoding constraints trivially
+    # resolved by switching to text writing. Let's do that.
+    with NamedTemporaryFile(mode='w', delete=False) as tmp_file:
+        with open(filename) as src_file:
+            for line in src_file:
+                tmp_file.write(pattern_compiled.sub(repl, line))
+
+    # Overwrite the original file with the munged temporary file in a
+    # manner preserving file attributes (e.g., permissions).
+    shutil.copystat(filename, tmp_file.name)
+    shutil.move(tmp_file.name, filename)
+
+def run_command_in_shell(cmdstring):
+    reprint(cmdstring)
+    p = subprocess.Popen(cmdstring, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True)
+    stdout, stderr = p.communicate()
+    # LOG = Path.cwd().joinpath(LOG_FILE)
+    with open(LOG, 'a') as logfile:
+        logfile.write(stdout)
+        logfile.write(stderr)
+    if stderr.strip() != "":
+        print('---')
+        print(stderr)
+        print('---')
+    else:
+        return stdout
+
+def run_command(cmdstring):
+    reprint(cmdstring)
+    p = subprocess.Popen(cmdstring.split(' '), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    stdout, stderr = p.communicate()
+    # LOG = Path.cwd().joinpath(LOG_FILE)
+    with open(LOG, 'a') as logfile:
+        logfile.write(stdout)
+        logfile.write(stderr)
+    if stderr.strip() != "":
+        print('---')
+        print(stderr)
+        print('---')
+    else:
+        return stdout
+
+
+def check_prerequisites():
+    print("Checking Prerequisites...")
+    programs = ['gmsh2mixd', 'shiftmixd', 'scalemixd', 'rmmat', 'gennmat', 'decompose.metis']
+    prgExists = [(shutil.which(prg) is not None) for prg in programs]
+    if False in prgExists:
+        print("\n".join("{}: {}".format(x,y) for x, y in zip(programs, prgExists)))
+        sys.exit(-1)
+
+    if not TEMPLATEDIR.is_dir():
+        print("No templates found!")
+        sys.exit(-1)
+
+
+def read_config():
+    with open(CONFIGFILE) as json_file:
+        config.update( json.load(json_file))
+    if (config['job-name'] == 'DIR'):
+        rootDir = Path.cwd().stem
+        config['job-name'] = rootDir
+
+
+def setup_dirs():
+    reprint("Creating FLOW directory...")
+    Path("FLOW/mesh").mkdir(parents=True, exist_ok=True)
+    # shutil.copy(TEMPLATEDIR.joinpath('xns.flow.in'      ), 'FLOW'     )
+    shutil.copy(TEMPLATEDIR.joinpath('mixd2xdmf.flow.in'), 'FLOW'     )
+    shutil.copy(TEMPLATEDIR.joinpath('job.flow.sh'      ), 'FLOW'     )
+
+    reprint("Creating MASS directory...")
+    Path("MASS/mesh").mkdir(parents=True, exist_ok=True)
+    # shutil.copy(TEMPLATEDIR.joinpath('xns.mass.in'      ), 'MASS'     )
+    shutil.copy(TEMPLATEDIR.joinpath('mixd2xdmf.mass.in'), 'MASS'     )
+    shutil.copy(TEMPLATEDIR.joinpath('job.mass.sh'      ), 'MASS'     )
+
+def edit_files():
+    EDITOR = environ.get('EDITOR','vim')
+    subprocess.call([EDITOR, 'FLOW/xns.flow.in', 'MASS/xns.mass.in'])
+
+def set_stage():
+    if environ.get('LMOD_DIR'):
+        module('--force purge')
+        module('use /usr/local/software/jureca/OtherStages')
+        module('load ' + STAGE)
+        module('load intel-para Boost flex')
+
+
+def transform_mixd():
+    run_command('shiftmixd -tet ' + config['shift'])
+    run_command('scalemixd -tet ' + config['scale'])
+
+def gen_spacetime_mesh(mshfile):
+    run_command('gmsh2mixd -m sd -d 4 ' + mshfile)
+    if config['transform'] == 'yes':
+        transform_mixd()
+    shutil.copy('mxyz', 'mxyz.space')
+    shutil.copy('mtbl', 'mtbl.space')
+    run_command_in_shell('cat mxyz.space >> mxyz')
+    run_command_in_shell('cat mtbl.space >> mtbl')
+    nn = int( run_command('tail -n 1 minf').split()[1] )
+    nn_st = nn * 2
+    sed_inplace('minf', 'nn', '# nn')
+    run_command_in_shell('echo "nn     '+str(nn_st)+'" >> minf')
+    for mfile in ['mien', 'mxyz', 'mrng', 'minf', 'mtbl', 'mmat']:
+        shutil.move(mfile, 'MASS/mesh/')
+    remove_beads()
+
+def remove_beads():
+    root = Path.cwd()
+    chdir('MASS/mesh/')
+    run_command('rmmat -tet -st ../../FLOW/mesh 2')
+    chdir(root)
+    # partition_flow()
+
+    with Pool(processes=2) as pool:
+        pool.map_async(partition_flow, [])
+        pool.map_async(partition_mass, [])
+
+
+def partition_flow():
+    root = Path.cwd()
+    chdir('FLOW/mesh/')
+
+    if config['decompose'] == 'yes':
+        run_command('gendual -e tet')
+        run_command('genneim --nen 4')
+        if config['decompose-backend'] == 'no':
+            run_command('decompose.metis -e tet -w -p ' + config['job-cpus'])
+        else:
+            run_command('srun -N1 -n24 -A ' + config['job-acct'] + ' -p ' + config['decompose-part'] + ' decompose.metis -e tet -w -p ' + config['job-cpus'])
+    else:
+        reprint("Not decomposing mesh")
+
+    chdir(root)
+    setup_flow()
+
+def partition_mass():
+    root = Path.cwd()
+    chdir('MASS/mesh/')
+
+    if config['decompose'] == 'yes':
+        run_command('gendual -e tet')
+        run_command('genneim --nen 4 -s')
+        if config['decompose-backend'] == 'no':
+            run_command('decompose.metis -e tet -w -s -p ' + config['job-cpus'])
+        else:
+            run_command('srun -N1 -n24 -A ' + config['job-acct'] + ' -p ' + config['decompose-part'] + ' decompose.metis -e tet -w -s -p ' + config['job-cpus'])
+    else:
+        reprint("Not decomposing mesh")
+
+    run_command('gennmat 4 st')
+    chdir(root)
+    setup_mass()
+
+def setup_flow():
+    Path("FLOW/sim").mkdir(parents=True, exist_ok=True)
+    # shutil.copy('FLOW/xns.flow.in', 'FLOW/sim/xns.in')
+    shutil.copy('xns.flow.in', 'FLOW/sim/xns.in')
+    shutil.copy('FLOW/job.flow.sh', 'FLOW/sim/job.sh')
+    root = Path.cwd()
+    chdir('FLOW/sim')
+    sed_inplace('job.sh', r'<job_name>', config['job-name'])
+    sed_inplace('job.sh', r'<job_cpus>', config['job-cpus'])
+    sed_inplace('job.sh', r'<job_acct>', config['job-acct'])
+    sed_inplace('job.sh', r'<job_part>', config['job-part'])
+    sed_inplace('job.sh', r'<job_flow_time>', config['job-flowtime'])
+    sed_inplace('job.sh', r'<xns_path>', config['xns-path'])
+    chdir(root)
+    setup_mass()
+
+def setup_mass():
+    Path("MASS/sim").mkdir(parents=True, exist_ok=True)
+    # shutil.copy('MASS/xns.mass.in', 'MASS/sim/xns.in')
+    shutil.copy('xns.mass.in', 'MASS/sim/xns.in')
+    shutil.copy('MASS/job.mass.sh', 'MASS/sim/job.sh')
+    root = Path.cwd()
+    chdir('MASS/sim')
+    sed_inplace('job.sh', r'<job_name>', config['job-name'])
+    sed_inplace('job.sh', r'<job_cpus>', config['job-cpus'])
+    sed_inplace('job.sh', r'<job_acct>', config['job-acct'])
+    sed_inplace('job.sh', r'<job_part>', config['job-part'])
+    sed_inplace('job.sh', r'<job_mass_time>', config['job-masstime'])
+    sed_inplace('job.sh', r'<xns_path>', config['xns-path'])
+    chdir(root)
+    # submit_sims()
+
+def submit_sims():
+    root = Path.cwd()
+    if config['submit'] == 'yes':
+        # prompt = input("Did you check your inputs? Are you sure you want to submit simulations? (y/n): ")
+        # if(prompt == 'y'):
+        chdir('FLOW/sim')
+        FJOUT = run_command('sub.sh -r')
+        FJID = FJOUT.split()[-1]
+        chdir(root)
+        chdir('MASS/sim')
+        sed_inplace('job.sh', r'<flow_jobid>', FJID)
+        sed_inplace('job.sh', r'##SBATCH -d', '#SBATCH -d')
+        run_command('sub.sh -r')
+        chdir(root)
+    else:
+        chdir('MASS/sim')
+        sed_inplace('job.sh', r'#SBATCH -d', '##SBATCH -d')
+        chdir(root)
+
+
+def create_config():
+
+    config["transform"] = "no"
+    config["shift"] = ""
+    config["scale"] = ""
+    config["job-name"] = "DIR"
+    config["job-cpus"] = "240"
+    config["job-acct"] = "jibg12"
+    config["job-part"] = "batch"
+    config["job-flowtime"] = "02:00:00"
+    config["job-masstime"] = "12:00:00"
+    config["xns-path"] = "~/bin/xns-mpi"
+    config["decompose"] = "yes"
+    config["decompose-backend"] = "yes"
+    config["decompose-part"] = "mem512"
+    config["submit"] = "no"
+
+    with open(CONFIGFILE, 'w') as json_file:
+        json.dump(config, json_file, indent=4)
+
+
+def kernel(mshfile):
+    root = Path.cwd()
+    # base, mshfile = os.path.split(os.path.abspath(mshfile))
+    mshfile = Path(mshfile).absolute().name
+    base = Path(mshfile).absolute().parent
+    chdir(base)
+    read_config()
+
+    if (execstring is None):
+        setup_dirs()
+        # edit_files()
+        gen_spacetime_mesh(mshfile)
+    elif (execstring == 'pf'):
+        partition_flow()
+    elif (execstring == 'pm'):
+        partition_mass()
+    elif (execstring == 'set'):
+        setup_flow()
+    elif (execstring == 'sub'):
+        config['submit'] = 'yes'
+        submit_sims()
+    elif (execstring == 'edit'):
+        edit_files()
+    else:
+        reprint("Bad Execstring!")
+
+    chdir(root)
+
+def reprint(string):
+    thread = current_process().name
+    print("Thread ", thread, ": " , string)
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-c", "--create-config", action='store_true', help="create an example config.json")
+    ap.add_argument("-e", "--execute", help="create an example config.json")
+    ap.add_argument("FILES", nargs='*', help="files")
+    args = vars(ap.parse_args())
+
+    if args['create_config']:
+        print("Config file created")
+        create_config()
+        sys.exit(0)
+
+    assert len(args['FILES']) != 0
+
+    global execstring
+    execstring = args['execute']
+
+    check_prerequisites()
+    # set_stage()
+    with Pool(processes=len(args['FILES'])) as pool:
+        pool.map(kernel, args['FILES'])
+
+    print("Done!")
+
+if __name__ == "__main__":
+    main()

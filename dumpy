@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+
+"""
+@desc:  Tool to handle big endian binary files: split, write to ascii, print to stdout, etc.
+@auth:  Jayghosh S. Rao
+@usage: ./dumpy <FILES> {-w outfile | -p} {-s <number of splits>} {-v <d | i>} {-z} {-d}
+@help: ./dumpy -h
+"""
+
+# TODO: Generalize this script
+
+import argparse
+import struct
+import sys
+import itertools
+import numpy as np
+
+def bin_to_arr(filename, f):
+    with(open(filename, 'rb')) as input:
+        myiter = struct.iter_unpack(f, input.read())
+
+        arr = []
+        for i in myiter:
+            arr.append(i[0])
+
+        return arr
+
+        # arr2 = arr[len(arr)//2:]
+        # arr2 = arr[0:len(arr)//2]
+
+def arr_to_bin(arr, filename, f):
+    with(open(filename, 'wb')) as output:
+        for i in arr:
+            output.write(struct.pack(f, i))
+
+def arr_to_ascii(arr, filename):
+    with(open(filename, 'w')) as output:
+        for item in arr:
+            output.write(item)
+
+def print_data(arr, n, vartype):
+    if vartype is 'd':
+        for chunk in grouper(arr,n):
+            print("\t".join("%.6E" % x for x in chunk))
+    elif vartype is 'i':
+        for chunk in grouper(arr,n):
+            print("\t".join("%d" % x for x in chunk))
+    # for item in arr:
+    #     print(item)
+
+def grouper(iterable, n):
+    it = iter(iterable)
+    while True:
+       chunk = tuple(itertools.islice(it, n))
+       if not chunk:
+           return
+       yield chunk
+
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-p", "--print", action='store_true', help="print to stdout")
+    ap.add_argument("-v", "--vartype", help="type of variable stored (d | i)", default='d')
+    ap.add_argument("-e", "--endianness", help="> or <", default='>')
+    ap.add_argument("-n", "--ndf", help="number of items per row", default=1, type=int)
+    ap.add_argument("-s", "--split", help="split file into pieces", default = 1, type=int)
+    ap.add_argument("-w", "--write", help="write to ascii file")
+    ap.add_argument("-z", "--zero-pad", action='store_true', help="Pre-pad file with zeroes")
+    ap.add_argument("-d", "--double", action='store_true', help="Double the file. Useful for converting semi-discrete to space-time data.")
+    ap.add_argument("FILES", nargs='*', help="files")
+    args = vars(ap.parse_args())
+
+    vartype = args['vartype']
+    infiles = args['FILES']
+    ndf = args['ndf']
+    endianness = args['endianness']
+    dataformat = endianness + vartype
+    split = 1
+    if args['split']:
+        split = args['split']
+
+    for infile in infiles:
+        # Input
+        array = bin_to_arr(infile, dataformat)
+        print("Infile: ", infile)
+
+        # Modify
+        zero_array = [ 0 for item in array ]
+        if args['zero_pad']:
+            array = zero_array + array
+
+        if args['double']:
+            array = array + array
+
+        out_arrays = []
+        out_arrays = np.array_split(np.array(array), split)
+
+        # Output
+        if args['print']:
+            for arr in out_arrays:
+                print_data(arr, ndf, vartype)
+        elif args['write']:
+            count = 0
+            for arr in out_arrays:
+                arr_to_bin(arr, args['write'] + str(count), dataformat)
+                count = count + 1
+        else:
+            print("No output option selected")
+
+if __name__ == "__main__":
+    main()
