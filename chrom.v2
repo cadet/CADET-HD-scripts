@@ -250,11 +250,11 @@ def decompose_mass():
 
     if config['decompose'] == 'yes':
         if config['decompose-mpi'] == 'yes':
-            run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'] + ' -s')
+            run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e ' + ETYPE + ' --mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
         elif config['decompose-backend'] == 'yes':
-            run_command('srun -N ' + config['decompose-N'] + ' -n' + config['decompose-np'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-part'] + ' decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'] + ' -s')
+            run_command('srun -N ' + config['decompose-N'] + ' -n' + config['decompose-np'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-part'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
         else:
-            run_command('decompose.metis -e '+ ETYPE + '-w -p ' + config['job-cpus'] + ' -s')
+            run_command('decompose.metis -e '+ ETYPE + ' --mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
     else:
         reprint("Not decomposing mesh")
 
