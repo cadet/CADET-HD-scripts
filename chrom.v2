@@ -171,7 +171,7 @@ def transform_mixd():
     run_command('scalemixd ' + ETYPE +  config['scale'])
 
 def gen_spacetime_mesh(mshfile):
-    run_command('gmsh2mixdv2 -d 4 ' + mshfile)
+    run_command('gmsh2mixdv2 -d 4 -o ' + config['mesh-order'] + ' ' + mshfile)
     if config['transform'] == 'yes':
         transform_mixd()
     shutil.copy('mxyz', 'mxyz.space')
