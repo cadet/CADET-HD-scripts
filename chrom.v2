@@ -135,7 +135,7 @@ def read_config():
     if (config['job-name'] == 'DIR'):
         rootDir = Path.cwd().stem
         config['job-name'] = rootDir
-    if (config['mesh-order']) == 2:
+    if (config['mesh-order']) == "2":
         global NEN, ETYPE
         NEN = "10 "
         ETYPE = "tetP2 "
@@ -318,8 +318,8 @@ def submit_sims():
 
 def create_config():
 
-    config["mesh-order"] = 1
-    config["mesh-dim"] = 3
+    config["mesh-order"] = "1"
+    config["mesh-dim"] = "3"
     config["transform"] = "no"
     config["shift"] = ""
     config["scale"] = ""
