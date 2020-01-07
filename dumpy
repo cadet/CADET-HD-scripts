@@ -7,7 +7,8 @@
 @help: ./dumpy -h
 """
 
-# TODO: Generalize this script
+# TODO: assert array element sizes before writing (int: 4 bytes, float: 4 bytes, double: 8 bytes)
+# TODO: in unchunked files, don't append 0 to output filename
 
 import argparse
 import struct
@@ -38,13 +39,31 @@ def arr_to_ascii(arr, filename):
         for item in arr:
             output.write(item)
 
+def ascii_to_arr(filename, vartype):
+    with(open(filename, 'r')) as inputfile:
+        arr = []
+        for line in inputfile:
+            val = line.strip()
+            arr.append(val)
+        if(vartype == 'i'):
+            arr = [ int(x) for x in arr]
+        elif(vartype == 'f'):
+            arr = [ np.float32(x) for x in arr]
+        elif(vartype == 'd'):
+            arr = [ float(x) for x in arr]
+        return arr
+
+
 def print_data(arr, n, vartype):
-    if vartype is 'd':
+    if vartype == 'd':
         for chunk in grouper(arr,n):
             print("\t".join("%.6E" % x for x in chunk))
-    elif vartype is 'i':
+    elif vartype == 'i':
         for chunk in grouper(arr,n):
             print("\t".join("%d" % x for x in chunk))
+    elif vartype == 'f':
+        for chunk in grouper(arr,n):
+            print("\t".join("%.6E" % x for x in chunk))
     # for item in arr:
     #     print(item)
 
@@ -61,11 +80,12 @@ def grouper(iterable, n):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-p", "--print", action='store_true', help="print to stdout")
+    ap.add_argument("-a", "--ascii_input", action='store_true', help="input is ascii file")
     ap.add_argument("-v", "--vartype", help="type of variable stored (d | i)", default='d')
     ap.add_argument("-e", "--endianness", help="> or <", default='>')
     ap.add_argument("-n", "--ndf", help="number of items per row", default=1, type=int)
     ap.add_argument("-s", "--split", help="split file into pieces", default = 1, type=int)
-    ap.add_argument("-w", "--write", help="write to ascii file")
+    ap.add_argument("-w", "--write", help="write to bin file")
     ap.add_argument("-z", "--zero-pad", action='store_true', help="Pre-pad file with zeroes")
     ap.add_argument("-d", "--double", action='store_true', help="Double the file. Useful for converting semi-discrete to space-time data.")
     ap.add_argument("FILES", nargs='*', help="files")
@@ -80,10 +100,18 @@ def main():
     if args['split']:
         split = args['split']
 
+    print('Note: Default endianness is big (>) to deal with xns files.')
+
     for infile in infiles:
         # Input
-        array = bin_to_arr(infile, dataformat)
         print("Infile: ", infile)
+
+        if args['ascii_input']:
+            array = ascii_to_arr(infile, vartype)
+        else:
+            array = bin_to_arr(infile, dataformat)
+
+
 
         # Modify
         zero_array = [ 0 for item in array ]
@@ -93,6 +121,7 @@ def main():
         if args['double']:
             array = array + array
 
+        # to split the file into chunks
         out_arrays = []
         out_arrays = np.array_split(np.array(array), split)
 
