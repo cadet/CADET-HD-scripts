@@ -39,10 +39,10 @@ with plt.style.context(['science']):
         ys.append(y)
         lines.append(line)
         count+=1
-    # legend = ax.legend(loc='best', shadow=True)
+    legend = ax.legend(loc='best', shadow=True)
     ax.set(title='Chromatogram')
     ax.set(xlabel='Time')
     ax.set(ylabel='Concentration')
     ax.autoscale(tight=True)
     fig.savefig('plot.pdf')
-    fig.savefig('plot.jpg', dpi=300)
+    # fig.savefig('plot.jpg', dpi=300)
