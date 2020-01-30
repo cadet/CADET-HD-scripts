@@ -12,8 +12,11 @@
 # TODO: Handle rngdexp****
 # DONE: writeout mesh data [Thu 16 Jan 2020 01:32:17 PM CET]
 # DONE: output CSV file [Thu 16 Jan 2020 01:31:49 PM CET]
+# TODO: allow it to operate on a standard csv file with all the data manually entered?
 
 import numpy as np
+import sympy as sp
+from sympy.parsing.sympy_parser import parse_expr
 import sys
 import os
 import json
@@ -120,6 +123,19 @@ def scale_mesh_volumes(mesh_data):
         mesh_data.update({mkey:value})
 
 
+def process_rngdexp(f,R):
+    x, y, r, theta = sp.symbols('x y r theta')
+    # f = 2.0*2.09e-4*( 1.0 - (x*x + y*y)/( 5.00999444e-4 * 5.00999444e-4 ) )
+    f = parse_expr(f)
+    f_r = f.subs({x: r*sp.cos(theta), y: r*sp.sin(theta)}).simplify()
+    f_r_2pr = (f_r*2*r*(np.pi)).simplify()
+    int_val=sp.integrate(f_r_2pr, (r, 0, R))
+    # act_int_val = np.pi * R * R * 2.09e-4
+    avg = int_val/(np.pi * R * R)
+    print("Average rngdexp = ", avg)
+    return avg
+
+
 def main():
     fsimfolder = sys.argv[1]
     msimfolder = sys.argv[2]
@@ -152,7 +168,6 @@ def main():
     except:
         pass
 
-    u    = float(xns_flow_data['rngdexp'][2])
 
     # print(json.dumps(xns_flow_data, indent=4))
     # print(json.dumps(xns_mass_data, indent=4))
@@ -163,6 +178,12 @@ def main():
     v_b_real = float(mesh_data['Real Bead Volume'])
     v_i_mesh = float(mesh_data['Mesh Int Volume'])
     v_b_mesh = float(mesh_data['Mesh Bead Volume'])
+
+    u = xns_flow_data['rngdexp'][2:]
+    u = ''.join(u)
+    # print(u)
+    # sys.exit(0)
+    u_avg = process_rngdexp(u, R)
 
     if (simtype == 'b'):
         vol_real_holdup = ana_holdup_vol(v_i_real, v_b_real, eps, qinf)
@@ -176,7 +197,7 @@ def main():
     else:
         print("Bad simtype expression: use 's | n | b' ")
 
-    vol_nume_holdup = num_holdup_vol(t, c, R, u)
+    vol_nume_holdup = num_holdup_vol(t, c, R, u_avg)
 
     print("real Vh = ", vol_real_holdup)
     print("mesh Vh = ", vol_mesh_holdup)
