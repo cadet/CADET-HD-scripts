@@ -5,10 +5,16 @@
 @auth:  Jayghosh S. Rao
 @usage: ./dumpy <FILES> {-w outfile | -p} {-s <number of splits>} {-v <d | i>} {-z} {-d}
 @help: ./dumpy -h
+@examples:
+    $ dumpy mrng -v i -p -n 4 | vim
+    $ dumpy two-spheres.ascii -v f -e '<' -w two-spheres.xyzd -a
+    $ dumpy two-spheres.xyzd0 -v f -e '<' -p
 """
 
 # TODO: assert array element sizes before writing (int: 4 bytes, float: 4 bytes, double: 8 bytes)
 # TODO: in unchunked files, don't append 0 to output filename
+
+
 
 import argparse
 import struct
@@ -138,4 +144,5 @@ def main():
             print("No output option selected")
 
 if __name__ == "__main__":
+    print(__doc__)
     main()
