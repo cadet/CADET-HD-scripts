@@ -6,6 +6,7 @@
 exec > >(tee "$HOME/xnsc.log") 2>&1
 set -euo pipefail
 
+
 [[ -z "$XNS_DEV_ROOT" ]] && echo "No dev root specified. Please set XNS_DEV_ROOT" && exit
 
 # basedir="$HOME/dev"
@@ -28,13 +29,22 @@ function preclean()
 
 function builder()
 {
+    
+    ## GCC10 hack
+    export FCFLAGS="-w -fallow-argument-mismatch -O2"
+    export FFLAGS="-w -fallow-argument-mismatch -O2"
+
     pkgdir="$1"
     extraargs="$2"
+
+    [ "$clean" = "ON" ] && rm -rf "$basedir/$pkgdir/build"
+
     cd "$basedir"/"$pkgdir" 
     mkdir -p build && cd build 
     echo "--------------------"
     echo "Compiling $pkgdir..."
     echo "$pkgdir $extraargs"
+
     cmake -DCMAKE_BUILD_TYPE=$buildtype -DCMAKE_INSTALL_PREFIX=$installprefix $extraargs ..
     make -j 24
     cmake -DCMAKE_BUILD_TYPE=$buildtype -DCMAKE_INSTALL_PREFIX=$installprefix $extraargs ..
@@ -47,8 +57,10 @@ function load_modules()
     if [[ "$compiler" == "intel" ]]; then 
         echo "setting up for intel compiler (JURECA)"
         
-        module --force purge
-        module load Intel IntelMPI imkl CMake flex Boost
+        if [[ "$(hostname)" =~ "jrl" ]]; then
+            module --force purge
+            module load Intel IntelMPI imkl CMake flex Boost
+        fi
 
         export CC=mpiicc
         export FC=mpiifort
@@ -60,7 +72,8 @@ function load_modules()
         
         export WITH_LAPACK="-DHAVE_LAPACK"
         export LAPACK_LIB="-llapack"
-        export FLAGS_FAST='-O3'
+        # export FLAGS_FAST='-O3'
+        export FLAGS_FAST='-O3 -ffast-math -mtune=native'
 
         export CC=mpicc
         export FC=mpifort
@@ -73,6 +86,8 @@ buildtype="Debug"
 installprefix="$HOME/local/simulation/"
 extraargs=""
 compiler="gnu"
+build_deps="ON"
+clean="OFF"
 
 
 POSITIONAL=()
@@ -82,7 +97,8 @@ do
 
     case $key in
         -c|--clean)
-            preclean
+            # preclean
+            clean="ON"
             shift # past value
             ;;
         -b|--build)
@@ -106,9 +122,18 @@ do
             extraargs="$extraargs"" -DMPI=OFF"
             shift # past value
             ;;
+        -a|--args)
+            extraargs="$extraargs"" $2"
+            shift # past value
+            shift
+            ;;
         -p|--prefix)
             installprefix="$2"
             shift # past value
+            shift # past value
+            ;;
+        -x|--xns)
+            build_deps="OFF"
             shift # past value
             ;;
         *)    # unknown option
@@ -120,7 +145,7 @@ done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
 load_modules
-builder "$ewddir" "$extraargs"
-builder "$mathlibdir" "$extraargs"
-builder "$sparskitdir" "$extraargs"
+[ "$build_deps" = "ON" ] && builder "$ewddir" "$extraargs"
+[ "$build_deps" = "ON" ] && builder "$mathlibdir" "$extraargs"
+[ "$build_deps" = "ON" ] && builder "$sparskitdir" "$extraargs"
 builder "$xnsdir" "$extraargs"
