@@ -142,7 +142,8 @@ do
             ;;
     esac
 done
-set -- "${POSITIONAL[@]}" # restore positional parameters
+# set -- "${POSITIONAL[@]}" # restore positional parameters
+set -- "${POSITIONAL[@]:-}" # restore positional parameters
 
 load_modules
 [ "$build_deps" = "ON" ] && builder "$ewddir" "$extraargs"

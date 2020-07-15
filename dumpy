@@ -14,6 +14,7 @@
 # TODO: assert array element sizes before writing (int: 4 bytes, float: 4 bytes, double: 8 bytes)
 # TODO: in unchunked files, don't append 0 to output filename
 
+# DONE: matplotlib for top view/side view of column?
 
 
 import argparse
@@ -21,6 +22,7 @@ import struct
 import sys
 import itertools
 import numpy as np
+import matplotlib.pyplot as plt
 
 def bin_to_arr(filename, f):
     with(open(filename, 'rb')) as input:
@@ -81,11 +83,23 @@ def grouper(iterable, n):
            return
        yield chunk
 
+def scatterPlot(x, y):
+    fig, ax = plt.subplots()
+    ax.scatter(x, y)
+    ax.legend(loc='best', shadow=True)
+    ax.set(title='Top View')
+    ax.set(xlabel='X')
+    ax.set(ylabel='Y')
+    ax.autoscale(tight=True)
+    fig.savefig('plot.pdf')
+    fig.savefig('plot.jpg', dpi=300)
+    # plt.show()
+
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("-p", "--print", action='store_true', help="print to stdout")
+    ap.add_argument("-p", "--plot", action='store_true', help="Plot X Y as scatter plot")
     ap.add_argument("-a", "--ascii_input", action='store_true', help="input is ascii file")
     ap.add_argument("-v", "--vartype", help="type of variable stored (d | i)", default='d')
     ap.add_argument("-e", "--endianness", help="> or <", default='>')
@@ -118,7 +132,6 @@ def main():
             array = bin_to_arr(infile, dataformat)
 
 
-
         # Modify
         zero_array = [ 0 for item in array ]
         if args['zero_pad']:
@@ -131,17 +144,22 @@ def main():
         out_arrays = []
         out_arrays = np.array_split(np.array(array), split)
 
-        # Output
-        if args['print']:
-            for arr in out_arrays:
-                print_data(arr, ndf, vartype)
-        elif args['write']:
+        # Output to STDOUT
+        for arr in out_arrays:
+            print_data(arr, ndf, vartype)
+
+        # Write to BIN output file
+        if args['write']:
             count = 0
             for arr in out_arrays:
                 arr_to_bin(arr, args['write'] + str(count), dataformat)
                 count = count + 1
-        else:
-            print("No output option selected")
+
+        if args['plot']:
+            for arr in out_arrays:
+                x = [ arr[i] for i in range(len(arr)) if i%4 == 0 ]
+                y = [ arr[i] for i in range(len(arr)) if i%4 == 1 ]
+                scatterPlot(x,y)
 
 if __name__ == "__main__":
     print(__doc__)
