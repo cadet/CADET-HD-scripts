@@ -9,13 +9,16 @@
     $ dumpy mrng -v i -p -n 4 | vim
     $ dumpy two-spheres.ascii -v f -e '<' -w two-spheres.xyzd -a
     $ dumpy two-spheres.xyzd0 -v f -e '<' -p
+    $ dumpy --packing packing.xyzd --nfo packing.nfo -w fixed.xyzd
 """
 
 # TODO: assert array element sizes before writing (int: 4 bytes, float: 4 bytes, double: 8 bytes)
-# TODO: in unchunked files, don't append 0 to output filename
+# DONE: in unchunked files, don't append 0 to output filename
+# DONE: Handle packing file and particle diameter scaling? Scale every nth value (scale-step?) by sf (scale-factor
 
 # DONE: matplotlib for top view/side view of column?
 
+from __future__ import print_function
 
 import argparse
 import struct
@@ -95,6 +98,19 @@ def scatterPlot(x, y):
     fig.savefig('plot.jpg', dpi=300)
     # plt.show()
 
+def calcFinalScalingFactor(filename):
+    data = {}
+    with open(filename) as fp:
+        for line in fp:
+            linesplit = line.strip().split(':')
+            data.update({linesplit[0].strip() : linesplit[1].strip().split('(')[0].strip()})
+    por_theoretical = float(data['Theoretical Porosity'])
+    por_final = float(data['Final Porosity'])
+
+    final_scaling_factor = ( (1-por_final) / (1-por_theoretical) )**(1/3)
+    print("Final Scaling Factor:", final_scaling_factor, file=sys.stderr)
+    return final_scaling_factor
+
 
 
 def main():
@@ -106,31 +122,54 @@ def main():
     ap.add_argument("-n", "--ndf", help="number of items per row", default=1, type=int)
     ap.add_argument("-s", "--split", help="split file into pieces", default = 1, type=int)
     ap.add_argument("-w", "--write", help="write to bin file")
+    ap.add_argument("-ss", "--scale-step", help="scale every scale-step'th value by scale-factor", default=1, type=int)
+    ap.add_argument("-sf", "--scale-factor", help="scale every scale-step'th value by scale-factor", default=1, type=float)
     ap.add_argument("-z", "--zero-pad", action='store_true', help="Pre-pad file with zeroes")
     ap.add_argument("-d", "--double", action='store_true', help="Double the file. Useful for converting semi-discrete to space-time data.")
+    ap.add_argument("--packing", action='store_true', help="Input file is packing.xyzd with e=< and n=4 v=d.")
+    ap.add_argument("--nfo", help="Read newly generated packing data and calculate final scaling factor from NFO file.")
     ap.add_argument("FILES", nargs='*', help="files")
     args = vars(ap.parse_args())
 
+    if args['packing']:
+        args['ndf'] = 4
+        args['endianness'] = '<'
+        args['plot'] = True
+
+    if args['nfo']:
+        final_scaling_factor = calcFinalScalingFactor(args['nfo'])
+        args['scale_step'] = 4
+        args['scale_factor'] = final_scaling_factor
+
     vartype = args['vartype']
-    infiles = args['FILES']
     ndf = args['ndf']
     endianness = args['endianness']
     dataformat = endianness + vartype
-    split = 1
-    if args['split']:
-        split = args['split']
 
-    print('Note: Default endianness is big (>) to deal with xns files.')
+    scale_step = args['scale_step']
+    scale_factor = args['scale_factor']
+
+    infiles = args['FILES']
+
+
+
+    # split = 1
+    # if args['split']:
+    #     split = args['split']
+
+    print('Note: Default endianness is big (>) to deal with xns files.', file=sys.stderr)
 
     for infile in infiles:
         # Input
-        print("Infile: ", infile)
+        print("Infile: ", infile, file=sys.stderr)
 
         if args['ascii_input']:
             array = ascii_to_arr(infile, vartype)
         else:
             array = bin_to_arr(infile, dataformat)
 
+        ## Apply scale_factor to every scale_step'th number
+        array[scale_step-1::scale_step] = [x*scale_factor for x in array[scale_step-1::scale_step]]
 
         # Modify
         zero_array = [ 0 for item in array ]
@@ -140,9 +179,10 @@ def main():
         if args['double']:
             array = array + array
 
+
         # to split the file into chunks
         out_arrays = []
-        out_arrays = np.array_split(np.array(array), split)
+        out_arrays = np.array_split(np.array(array), args['split'])
 
         # Output to STDOUT
         for arr in out_arrays:
@@ -150,10 +190,12 @@ def main():
 
         # Write to BIN output file
         if args['write']:
-            count = 0
-            for arr in out_arrays:
-                arr_to_bin(arr, args['write'] + str(count), dataformat)
-                count = count + 1
+            if len(out_arrays) > 1:
+                for count, arr, in enumerate(out_arrays):
+                    writeoutfile = args['write'] + str(count)
+                    arr_to_bin(arr, writeoutfile, dataformat)
+            else:
+                arr_to_bin(arr, args['write'], dataformat)
 
         if args['plot']:
             for arr in out_arrays:
