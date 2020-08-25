@@ -334,9 +334,9 @@ def create_config():
     config["decompose"] = "no"
     config["decompose-mpi"] = "no"
     config["decompose-backend"] = "no"
-    config["decompose-part"] = "mem512"
+    config["decompose-part"] = "devel"
     config["decompose-np"] = "24"
-    config["decompose-N"] = "1"
+    config["decompose-N"] = "5"
     config["submit"] = "no"
 
     with open(CONFIGFILE, 'w') as json_file:
