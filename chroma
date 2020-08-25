@@ -42,6 +42,9 @@ from multiprocessing import Pool, current_process
 # DONE: consider more nodes allocated for decompose operation (in case of large meshes)
 # TODO: vipe the config if it doesn't exist
 # TODO: handle second order and first order meshes: Allow specifying the full gendual/genneim and other commands in the config file.
+# TODO: Fix gennmat
+# TODO: kernel optional argument mshfile
+# TODO: kernel async pool decompose mass fix
 
 # For use with slurm:
 # $ export PYTHONPATH=${PYTHONPATH}:$LMOD_DIR/../init
@@ -237,7 +240,7 @@ def partition_mass():
 
     if config['partition'] == 'yes':
         run_command('gendual -e ' + ETYPE)
-        run_command('genneim --nen ' + NEN +' -s')
+        run_command('genneim --nen ' + NEN + '-s')
     else:
         reprint("Not partitioning mesh")
 
@@ -250,11 +253,11 @@ def decompose_mass():
 
     if config['decompose'] == 'yes':
         if config['decompose-mpi'] == 'yes':
-            run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e ' + ETYPE + ' --mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
+            run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
         elif config['decompose-backend'] == 'yes':
             run_command('srun -N ' + config['decompose-N'] + ' -n' + config['decompose-np'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-part'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
         else:
-            run_command('decompose.metis -e '+ ETYPE + ' --mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
+            run_command('decompose.metis -e '+ ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
     else:
         reprint("Not decomposing mesh")
 
@@ -374,9 +377,9 @@ def kernel(mshfile):
             pool.close()
             pool.join()
     elif (execstring == 'df'):
-        decompose_flow();
+        decompose_flow()
     elif (execstring == 'dm'):
-        decompose_mass();
+        decompose_mass()
     elif (execstring == 'set'):
         setup_flow()
     elif (execstring == 'sub'):
