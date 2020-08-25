@@ -126,15 +126,23 @@ def main():
     ap.add_argument("-sf", "--scale-factor", help="scale every scale-step'th value by scale-factor", default=1, type=float)
     ap.add_argument("-z", "--zero-pad", action='store_true', help="Pre-pad file with zeroes")
     ap.add_argument("-d", "--double", action='store_true', help="Double the file. Useful for converting semi-discrete to space-time data.")
-    ap.add_argument("--packing", action='store_true', help="Input file is packing.xyzd with e=< and n=4 v=d.")
+    ap.add_argument("--dpacking", action='store_true', help="Input file is packing.xyzd with e=< and n=4 v=d.")
+    ap.add_argument("--fpacking", action='store_true', help="Input file is packing.xyzd with e=< and n=4 v=f.")
     ap.add_argument("--nfo", help="Read newly generated packing data and calculate final scaling factor from NFO file.")
     ap.add_argument("FILES", nargs='*', help="files")
     args = vars(ap.parse_args())
 
-    if args['packing']:
+    if args['dpacking']:
         args['ndf'] = 4
         args['endianness'] = '<'
         args['plot'] = True
+        args['vartype'] = 'd'
+
+    if args['fpacking']:
+        args['ndf'] = 4
+        args['endianness'] = '<'
+        args['plot'] = True
+        args['vartype'] = 'f'
 
     if args['nfo']:
         final_scaling_factor = calcFinalScalingFactor(args['nfo'])
@@ -169,6 +177,7 @@ def main():
             array = bin_to_arr(infile, dataformat)
 
         ## Apply scale_factor to every scale_step'th number
+        ## Can scale X, Y, Z, or R/D individually or everything at once
         array[scale_step-1::scale_step] = [x*scale_factor for x in array[scale_step-1::scale_step]]
 
         # Modify
