@@ -1,4 +1,4 @@
-#!/bin/env pvpython
+#!/bin/env -S pvpython --force-offscreen-rendering
 
 """
 A Paraview script to aid the postprocessing of data. I wrote it mainly to generate images out of output files.
@@ -8,11 +8,13 @@ Usage by examples:
     > pvpython --force-offscreen-rendering /path/to/vis.py **/*pvtu -s -c scalar_2 scalar_3 -p slice  ## for listed pvtu files, output scalar_2 and scalar_3 slice data
     > mpirun -np 4 pvbatch /path/to/vis.py -f pvtu -s                   ## looks for pvtu files in current folder, clips them, snapshots all scalars,
     > mpirun -np 4 pvbatch /path/to/vis.py **/*pvtu -d out-distributed  ## for listed pvtu files, apply d3 filter and write to out-distributed
+    > mpirun -np 4 pvbatch /path/to/vis.py example-case_{150..300}.pvtu -s  ## Uses bash's sequence expansion
 
 Usage notes:
     > don't forget to use a processing flag like -s or -d or -w
     > -c flag takes a list as input, make sure to use it AFTER filepaths
     > -f filetype is optional. Default is pvtu.
+    > The program ALWAYS starts animation outputs with suffix 0000, regardless of the timestep data you've supplied. So be wary of using it twice in the same dir.
 
 """
 
@@ -21,8 +23,9 @@ Usage notes:
 ## DONE: Fix flow animate problem
 ## DONE: Allow screenshotting ALL scalars in one run
 ## TODO: config.json file
-## TODO: Parametrize view size
+## DONE: Parametrize view size geometry
 ## TODO: Parametrize background color
+## TODO: fix timestep data (probably in mixd2pvtu)
 
 import argparse
 from paraview.simple import *
@@ -81,6 +84,7 @@ def snapshot(reader, **kwargs):
     projectionType = kwargs.get('projectionType', 'clip')
     colorVars = kwargs.get('colorVars', reader.PointArrayStatus) or reader.PointArrayStatus
     scalarBarVisible = kwargs.get('scalarBarVisible', True)
+    geometry = kwargs.get('geometry')
 
     animationScene1 = GetAnimationScene()
     timeKeeper1 = GetTimeKeeper()
@@ -119,53 +123,54 @@ def snapshot(reader, **kwargs):
 
         ColorBy(projectionDisplay, ('POINTS', colorVar))
 
-        # wLUT = GetColorTransferFunction(colorVar)
-        # wPWF = GetOpacityTransferFunction(colorVar)
-        # HideScalarBarIfNotNeeded(wLUT, renderView1)
-        # projectionDisplay.UpdatePipeline()
+        wLUT = GetColorTransferFunction(colorVar)
+        wPWF = GetOpacityTransferFunction(colorVar)
+        HideScalarBarIfNotNeeded(wLUT, renderView1)
+
+        ## NOTE: For color presets.
+        wLUT.ApplyPreset('Cool to Warm (Extended)', True)
 
         projectionDisplay.RescaleTransferFunctionToDataRange(True,False)
 
         renderView1.Update()
         renderView1.ResetCamera()
 
+        renderView1.ViewSize = geometry
         renderView1.CameraPosition = [0.0005945160428284565, 1.959300980464672e-13, -1.3552527156068805e-20]
         renderView1.CameraFocalPoint = [-2.549999918319142e-05, 1.959300980464672e-13, -1.3552527156068805e-20]
         renderView1.CameraViewUp = [0.0, 0.0, 1.0]
         renderView1.CameraParallelScale = 0.00016047195994169908
         renderView1.ResetCamera()
-        renderView1.ViewSize = [1750, 1300]
 
-        # SaveScreenshot('FLOW_'+colorVar+'.png', renderView1, ImageResolution=[1750, 1300], TransparentBackground=1)
-        SaveAnimation(colorVar + '.png', renderView1, ImageResolution=[1750, 1300], TransparentBackground=1, SuffixFormat='.%04d')
+        # renderView1.ViewSize = [1750, 1300]
+        # SaveAnimation(colorVar + '.png', renderView1, ImageResolution=[1750, 1300], TransparentBackground=1, SuffixFormat='.%04d')
+
+        SaveAnimation(colorVar + '.png', renderView1, ImageResolution=geometry, TransparentBackground=1, SuffixFormat='.%04d')
 
 
 def main():
 
     ap = argparse.ArgumentParser()
 
-    ap.add_argument("-p", "--projectionType", required=False, default='clip',
-            help="projection type: clip | slice")
-    ap.add_argument("-s", "--snapshot", required=False, action='store_true',
-            help="run snapshotter")
-    ap.add_argument("-d", "--distribute", required=False,
-            help="Apply d3 filter and save data")
-    ap.add_argument("-m", "--mass-defect", required=False, action='store_true',
-            help="Integrate and find mass_defect curve")
-    ap.add_argument("--no-scalar-bar", required=False, action='store_true', default=False,
-            help="Disable scalar bar visibility")
-    ap.add_argument("-c", "--colorVars", required=False, nargs='*',
-            help="color map variable")
+    ap.add_argument("-p", "--projectionType", required=False, default='clip', help="projection type: clip | slice")
+    ap.add_argument("-s", "--snapshot", required=False, action='store_true', help="run snapshotter")
+    ap.add_argument("-d", "--distribute", required=False, help="Apply d3 filter and save data")
+    ap.add_argument("-m", "--mass-defect", required=False, action='store_true', help="Integrate and find mass_defect curve")
 
-    ap.add_argument("-f", "--filetype", required=False, default='pvtu', choices=['xdmf', 'vtu', 'vtk', 'pvtu'],
-            help="filetype: xdmf | vtu | vtk | pvtu")
-    ap.add_argument("-w", "--writer", required=False, choices=['xdmf', 'vtu', 'vtk', 'pvtu'],
-            help="writer: xdmf | vtu | vtk | pvtu")
+    ap.add_argument("-c", "--colorVars", required=False, nargs='*', help="color map variable")
+    ap.add_argument("-nsb", "--no-scalar-bar", required=False, action='store_true', default=False, help="Disable scalar bar visibility")
+    ap.add_argument("-g", "--geometry", required=False, nargs=2, type=int, default=[1750, 1300], help="Animation geometry size")
 
-    ap.add_argument("FILES", nargs='*',
-            help="files..")
+    ap.add_argument("-f", "--filetype", required=False, default='pvtu', choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="filetype: xdmf | vtu | vtk | pvtu")
+    ap.add_argument("-w", "--writer", required=False, choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="writer: xdmf | vtu | vtk | pvtu")
+
+    ap.add_argument("FILES", nargs='*', help="files..")
 
     args = vars(ap.parse_args())
+
+    # print(args['geometry'])
+    # for x in args['geometry']:
+    #     print(type(x))
 
     if len(args['FILES']) == 0:
         filetype = args['filetype']
@@ -180,7 +185,7 @@ def main():
         if len(fileExtensions) > 1:
             print("Mixed File Formats Given!")
             sys.exit(-1)
-        filetype = fileExtensions.pop()
+        filetype = fileExtensions.pop().replace('.', '')
 
     for key in args:
         print(key + ': ', args[key])
@@ -208,7 +213,8 @@ def main():
         snapshot(reader,
                 projectionType = args['projectionType'],
                 colorVars = args['colorVars'],
-                scalarBarVisible = not args['no_scalar_bar']
+                scalarBarVisible = not args['no_scalar_bar'],
+                geometry = args['geometry']
                 )
 
     if args['mass_defect']:
