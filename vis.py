@@ -5,13 +5,14 @@ A Paraview script to aid the postprocessing of data. I wrote it mainly to genera
 
 Usage by examples:
     > ./vis.py -h
-    > pvpython --force-offscreen-rendering /path/to/vis.py -r pvtu **/*pvtu -s -c scalar_2 scalar_3 -p slice
-    > mpirun -np 4 pvbatch /path/to/vis.py -r pvtu **/*pvtu -s
-    > mpirun -np 4 pvbatch /path/to/vis.py -r pvtu **/*pvtu -d out-distributed
+    > pvpython --force-offscreen-rendering /path/to/vis.py **/*pvtu -s -c scalar_2 scalar_3 -p slice  ## for listed pvtu files, output scalar_2 and scalar_3 slice data
+    > mpirun -np 4 pvbatch /path/to/vis.py -f pvtu -s                   ## looks for pvtu files in current folder, clips them, snapshots all scalars,
+    > mpirun -np 4 pvbatch /path/to/vis.py **/*pvtu -d out-distributed  ## for listed pvtu files, apply d3 filter and write to out-distributed
 
 Usage notes:
     > don't forget to use a processing flag like -s or -d or -w
     > -c flag takes a list as input, make sure to use it AFTER filepaths
+    > -f filetype is optional. Default is pvtu.
 
 """
 
@@ -31,6 +32,7 @@ import vtk.util.numpy_support as ns
 import numpy as np
 from matplotlib import pyplot as plt
 import os
+import sys
 
 def MIXDReader():
     pass
@@ -155,47 +157,46 @@ def main():
     ap.add_argument("-c", "--colorVars", required=False, nargs='*',
             help="color map variable")
 
-    ap.add_argument("-r", "--reader", required=False,
-            help="reader: xdmf | vtu | vtk | pvtu")
-    ap.add_argument("-w", "--writer", required=False,
-            help="reader: xdmf | vtu | vtk | pvtu")
+    ap.add_argument("-f", "--filetype", required=False, default='pvtu', choices=['xdmf', 'vtu', 'vtk', 'pvtu'],
+            help="filetype: xdmf | vtu | vtk | pvtu")
+    ap.add_argument("-w", "--writer", required=False, choices=['xdmf', 'vtu', 'vtk', 'pvtu'],
+            help="writer: xdmf | vtu | vtk | pvtu")
 
     ap.add_argument("FILES", nargs='*',
             help="files..")
+
     args = vars(ap.parse_args())
 
-    for key in args:
-        print(key + ': ', args[key])
+    if len(args['FILES']) == 0:
+        filetype = args['filetype']
 
-    if not args['FILES']:
-        print("No Input Files Given!")
-        sys.exit(0)
+        args['FILES'] = sorted([ file for file in os.listdir(".") if file.endswith(filetype) ], key=lambda x: int(x.split('.')[0].split('_')[-1]))
 
-    reader=None
-    if args['reader'] == 'xdmf':
-        reader = XDMFReader(FileNames=args['FILES'])
-    elif args['reader'] == 'vtu':
-        reader = XMLUnstructuredGridReader(FileName=args['FILES'])
-    elif args['reader'] == 'pvtu':
-        reader = XMLPartitionedUnstructuredGridReader(FileName=args['FILES'])
-    elif args['reader'] == 'vtk':
-        reader = LegacyVTKReader(FileName=args['FILES'])
+        if len(args['FILES']) == 0:
+            print("Didn't find", filetype, "files in current folder.")
+            sys.exit(-1)
     else:
         fileExtensions = set([os.path.splitext(infile)[1] for infile in args['FILES']])
         if len(fileExtensions) > 1:
             print("Mixed File Formats Given!")
-        fileExtension = fileExtensions.pop()
-        if fileExtension == '.xdmf':
-            reader = XDMFReader(FileNames=args['FILES'])
-        elif fileExtension == '.vtu':
-            reader = XMLUnstructuredGridReader(FileName=args['FILES'])
-        elif fileExtension == '.pvtu':
-            reader = XMLPartitionedUnstructuredGridReader(FileName=args['FILES'])
-        elif fileExtension == '.vtk':
-            reader = LegacyVTKReader(FileName=args['FILES'])
-        else:
-            print("Unsupported File Format!")
             sys.exit(-1)
+        filetype = fileExtensions.pop()
+
+    for key in args:
+        print(key + ': ', args[key])
+
+    reader=None
+    if filetype == 'xdmf':
+        reader = XDMFReader(FileNames=args['FILES'])
+    elif filetype == 'vtu':
+        reader = XMLUnstructuredGridReader(FileName=args['FILES'])
+    elif filetype == 'pvtu':
+        reader = XMLPartitionedUnstructuredGridReader(FileName=args['FILES'])
+    elif filetype == 'vtk':
+        reader = LegacyVTKReader(FileName=args['FILES'])
+    else:
+        print("Unsupported File Format!")
+        sys.exit(-1)
 
     if args['distribute']:
         d3 = D3(Input=reader)
@@ -214,7 +215,6 @@ def main():
         mass_defect(reader);
 
     if args['writer']:
-        print("ENTERED WRITER")
         writer=None
 
         if args['writer'] == 'xdmf':
