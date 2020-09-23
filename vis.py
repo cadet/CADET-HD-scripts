@@ -15,6 +15,7 @@ Usage notes:
     > -c flag takes a list as input, make sure to use it AFTER filepaths
     > -f filetype is optional. Default is pvtu.
     > The program ALWAYS starts animation outputs with suffix 0000, regardless of the timestep data you've supplied. So be wary of using it twice in the same dir.
+    > Assumes that timestep suffix is "_%d" to autodetect files in current directory
 
 """
 
@@ -22,10 +23,12 @@ Usage notes:
 ## DONE: distribute to parallel
 ## DONE: Fix flow animate problem
 ## DONE: Allow screenshotting ALL scalars in one run
-## TODO: config.json file
 ## DONE: Parametrize view size geometry
+## TODO: config.json file
 ## TODO: Parametrize background color
 ## TODO: fix timestep data (probably in mixd2pvtu)
+## TODO: rotated views [Good for image resolution in long columns]
+## TODO: After updatescalarbars() they are always visible even with -nsb
 
 import argparse
 from paraview.simple import *
@@ -84,22 +87,23 @@ def snapshot(reader, **kwargs):
     projectionType = kwargs.get('projectionType', 'clip')
     colorVars = kwargs.get('colorVars', reader.PointArrayStatus) or reader.PointArrayStatus
     scalarBarVisible = kwargs.get('scalarBarVisible', True)
+    axisVisible = kwargs.get('axisVisible', True)
     geometry = kwargs.get('geometry')
 
     animationScene1 = GetAnimationScene()
     timeKeeper1 = GetTimeKeeper()
     animationScene1.UpdateAnimationUsingDataTimeSteps()
 
-    try:
-        ## Use last timestep as reference for creating color map
-        animationScene1.AnimationTime = reader.TimestepValues[-1]
-        timeKeeper1.Time = reader.TimestepValues[-1]
-    except:
-        ## for files without time data
-        animationScene1.AnimationTime = 0
-        animationScene1.StartTime = 0
-        animationScene1.EndTime = 0
-        timeKeeper1.Time = 0
+    # try:
+    #     ## Use last timestep as reference for creating color map
+    #     animationScene1.AnimationTime = reader.TimestepValues[-1]
+    #     timeKeeper1.Time = reader.TimestepValues[-1]
+    # except:
+    #     ## for files without time data
+    #     animationScene1.AnimationTime = 0
+    #     animationScene1.StartTime = 0
+    #     animationScene1.EndTime = 0
+    #     timeKeeper1.Time = 0
 
     projection = None
 
@@ -117,11 +121,25 @@ def snapshot(reader, **kwargs):
     projectionDisplay = Show(projection, renderView1)
     projectionDisplay.Representation = 'Surface'
     projectionDisplay.SetScalarBarVisibility(renderView1, scalarBarVisible)
+    renderView1.OrientationAxesVisibility = int(axisVisible)
+    projectionDisplay.RescaleTransferFunctionToDataRange()
+
+
+    renderView1.Update()
+    renderView1.ResetCamera()
+    renderView1.ViewSize = geometry
+    renderView1.CameraPosition = [0.0005945160428284565, 1.959300980464672e-13, -1.3552527156068805e-20]
+    renderView1.CameraFocalPoint = [-2.549999918319142e-05, 1.959300980464672e-13, -1.3552527156068805e-20]
+    renderView1.CameraViewUp = [0.0, 0.0, 1.0]
+    renderView1.CameraParallelScale = 0.00016047195994169908
+    renderView1.ResetCamera()
 
     for colorVar in colorVars:
         print("Animating", colorVar )
 
+
         ColorBy(projectionDisplay, ('POINTS', colorVar))
+        projectionDisplay.RescaleTransferFunctionToDataRange()
 
         wLUT = GetColorTransferFunction(colorVar)
         wPWF = GetOpacityTransferFunction(colorVar)
@@ -130,17 +148,8 @@ def snapshot(reader, **kwargs):
         ## NOTE: For color presets.
         wLUT.ApplyPreset('Cool to Warm (Extended)', True)
 
-        projectionDisplay.RescaleTransferFunctionToDataRange(True,False)
-
         renderView1.Update()
-        renderView1.ResetCamera()
-
-        renderView1.ViewSize = geometry
-        renderView1.CameraPosition = [0.0005945160428284565, 1.959300980464672e-13, -1.3552527156068805e-20]
-        renderView1.CameraFocalPoint = [-2.549999918319142e-05, 1.959300980464672e-13, -1.3552527156068805e-20]
-        renderView1.CameraViewUp = [0.0, 0.0, 1.0]
-        renderView1.CameraParallelScale = 0.00016047195994169908
-        renderView1.ResetCamera()
+        UpdateScalarBars()
 
         # renderView1.ViewSize = [1750, 1300]
         # SaveAnimation(colorVar + '.png', renderView1, ImageResolution=[1750, 1300], TransparentBackground=1, SuffixFormat='.%04d')
@@ -158,8 +167,9 @@ def main():
     ap.add_argument("-m", "--mass-defect", required=False, action='store_true', help="Integrate and find mass_defect curve")
 
     ap.add_argument("-c", "--colorVars", required=False, nargs='*', help="color map variable")
-    ap.add_argument("-nsb", "--no-scalar-bar", required=False, action='store_true', default=False, help="Disable scalar bar visibility")
     ap.add_argument("-g", "--geometry", required=False, nargs=2, type=int, default=[1750, 1300], help="Animation geometry size")
+    ap.add_argument("-nsb", "--no-scalar-bar", required=False, action='store_true', default=False, help="Disable scalar bar visibility")
+    ap.add_argument("-nca", "--no-coordinate-axis", required=False, action='store_true', default=False, help="Disable coordinate axis visibility")
 
     ap.add_argument("-f", "--filetype", required=False, default='pvtu', choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="filetype: xdmf | vtu | vtk | pvtu")
     ap.add_argument("-w", "--writer", required=False, choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="writer: xdmf | vtu | vtk | pvtu")
@@ -214,7 +224,8 @@ def main():
                 projectionType = args['projectionType'],
                 colorVars = args['colorVars'],
                 scalarBarVisible = not args['no_scalar_bar'],
-                geometry = args['geometry']
+                geometry = args['geometry'],
+                axisVisible = not args['no_coordinate_axis']
                 )
 
     if args['mass_defect']:

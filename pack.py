@@ -247,15 +247,16 @@ def main():
     print("h:", h)
     print("Cylinder Volume:", fullBed.CylinderVolume)
     print("Packed Bed Volume:", fullBed.volume())
+    print("Column Porosity:", 1-(fullBed.volume()/fullBed.CylinderVolume))
     print("nBeads: ", len(fullBed.beads))
 
-    # bridgeOffsetRatio = 0.95
-    bridgeOffsetRatio = sqrt(1 - relativeBridgeRadius**2)
-    bridgeTol = 0.04 * meshScalingFactor
+    # # bridgeOffsetRatio = 0.95
+    # bridgeOffsetRatio = sqrt(1 - relativeBridgeRadius**2)
+    # bridgeTol = 0.04 * meshScalingFactor
 
-    addedBridgeVol, removedBridgeVol = bridgeVolumes(fullBed.beads, bridgeTol, relativeBridgeRadius, bridgeOffsetRatio)
-    print("Bridge Added Volume:", addedBridgeVol)
-    print("Capped Removed Volume:", removedBridgeVol)
+    # addedBridgeVol, removedBridgeVol = bridgeVolumes(fullBed.beads, bridgeTol, relativeBridgeRadius, bridgeOffsetRatio)
+    # print("Bridge Added Volume:", addedBridgeVol)
+    # print("Capped Removed Volume:", removedBridgeVol)
 
     sys.exit(0)
 
