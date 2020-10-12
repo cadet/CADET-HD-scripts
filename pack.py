@@ -8,7 +8,6 @@
         zBot: bottom limit of slice to look for beads by center point.
         zTop: top limit of slice ...
         scaling factor: two packing.xyzd might not have the same dimensions. This helps fix that.
-
 """
 
 # DONE: implement use of histo
@@ -24,12 +23,19 @@ import sys
 import struct
 import itertools
 import numpy as np
+import argparse
 from matplotlib import pyplot as plt
 import matplotlib
 from math import asin,sqrt,pi
 from mpmath import ellipk, ellipe, ellipf, nstr
 from multiprocessing import Pool
 from functools import partial
+import pickle
+import os.path
+
+
+NBINS=20                   ## NPARTYPE in CADET
+NREGIONS = 40               ## NRAD in CADET
 
 class Bead:
     """Class for individual beads"""
@@ -89,6 +95,11 @@ class PackedBed:
             zpr.append(bead.z + bead.r)
             zmr.append(bead.z - bead.r)
 
+        radList = [ bead.r for bead in self.beads ]
+        self.rmax = max(radList)
+        self.rmin = min(radList)
+        self.ravg = sum(radList)/len(radList)
+
         self.xmax = max(xpr)
         self.ymax = max(ypr)
         self.ymin = min(ymr)
@@ -133,31 +144,51 @@ def bin_to_arr(filename, f):
 
         return arr
 
-def histo(radii, filename):
+def pickler(item, filename):
+    """
+    > Save item to file.
+    > For easy transport of lists/arrays to cadet
+    """
+    with open(filename, "wb") as f:
+        pickle.dump(item, f)
+        print("pickled", filename)
+
+def unpickler(filename):
+    with open(filename, "rb") as f:
+        item = pickle.load(f)
+        print("Unpickled", filename)
+    return item
+
+def histo(radii, **kwargs):
     """Create histogram for a particular bead size distribution.
         Also output volume fractions & mean radii to be used in CADET Polydisperse"""
-    V=[4*np.pi*x*x*x/3 for x in radii]
-    h,e = np.histogram(radii, bins=20, density=True, weights=V)
 
+    filename = kwargs.get('filename', None)
+    bins = kwargs.get('bins', NBINS)
+
+    V=[4*np.pi*x*x*x/3 for x in radii]
+    # print(radii)
+    h,e = np.histogram(radii, bins=bins, density=True, weights=V)
+    # print("H: ", h)
     frac=[x/sum(h) for x in h]
     # print(sum(frac))
     w=2
     avg=np.convolve(e, np.ones(w), 'valid') / w
-    print('vol_frac:', frac)
-    print('mean_radii:', list(avg))
 
+    if filename:
+        with plt.style.context(['science']):
+            matplotlib.rcParams['font.sans-serif'] = "Verdana"
+            matplotlib.rcParams['font.family'] = "sans-serif"
 
-    with plt.style.context(['science']):
-        matplotlib.rcParams['font.sans-serif'] = "Verdana"
-        matplotlib.rcParams['font.family'] = "sans-serif"
+            fig, ax = plt.subplots()
+            ax.hist(radii, bins=bins)
 
-        fig, ax = plt.subplots()
-        ax.hist(radii, bins=20)
+            ax.set(title=filename)
+            ax.set_xlabel('Bead Radius ($m$)')
+            ax.set(ylabel='Frequency')
+            fig.savefig(filename + '.pdf')
 
-        ax.set(title=filename)
-        ax.set_xlabel('Bead Radius ($m$)')
-        ax.set(ylabel='Frequency')
-        fig.savefig(filename + '.pdf')
+    return frac, list(avg)
 
 def CylSphIntVolume(rho, eta):
     """ Analytical Formulae to calculate intersection between cylinder and sphere.
@@ -215,16 +246,57 @@ def CylSphIntVolume(rho, eta):
         print("ERROR")
         return 0
 
+# def getInput(infile, key):
+#     pass
+
 def main():
-    packing = sys.argv[1]
-    zBot = float(sys.argv[2])
-    zTop = float(sys.argv[3])
-    scaling_factor = float(sys.argv[4])
-    rFactor = 0.99
-    print("rFactor: ", rFactor)
-    # rFactor = 1
-    meshScalingFactor = 1e-4
+
+    ap = argparse.ArgumentParser()
+
+    ap.add_argument("-i", "--inputfile", help="Input file used for genmesh")
+    ap.add_argument("-p", "--packing", help="Packing file")
+    ap.add_argument("-z", "--zlimits", type=float, nargs=2, help="bottom z value for packing slice")
+    ap.add_argument("-psf", "--pre-scaling-factor", type=float, default=1, help="Scaling factor to account for differences in mono/poly packing data")
+    ap.add_argument("-msf", "--mesh-scaling-factor", type=float, default=1e-4, help="Post meshing scaling factor")
+    ap.add_argument("-rf", "--r-factor", type=float, default=1, help="Bead radius shrinking factor")
+
+    # ap.add_argument("FILES", nargs='*', help="files..")
+
+    args = vars(ap.parse_args())
+
+    infiledict = {}
+
+    if args['inputfile']:
+        fp = open(args['inputfile'], 'r')
+        infiledict = {line.strip().split()[0].strip(): line.strip().split()[1].strip() for line in fp}
+        fp.close()
+
+        packing = infiledict['packing']
+        zBot = float(infiledict['zBot'])
+        zTop = float(infiledict['zTop'])
+        scaling_factor = float(infiledict['preScalingFactor'])
+        rFactor = float(infiledict['rFactor'])
+        meshScalingFactor = float(infiledict['Mesh.ScalingFactor'])
+    else:
+        packing = args['packing']
+        zBot = args['zlimits'][0]
+        zTop = args['zlimits'][1]
+        scaling_factor = args['pre_scaling_factor']
+        rFactor = args['r_factor']
+        meshScalingFactor = args['mesh_scaling_factor']
+
+    print("packing:", packing)
+    print("zBot:", zBot)
+    print("zTop:", zTop)
+    print("scaling_factor:", scaling_factor)
+    print("rFactor:", rFactor)
+    print("meshScalingFactor:", meshScalingFactor)
+
     relativeBridgeRadius = 0.2
+
+    rCylDelta = 0.01*meshScalingFactor
+    inlet = 2.5 * meshScalingFactor
+    outlet = 2.5 * meshScalingFactor
 
     fullBed = PackedBed()
 
@@ -239,16 +311,24 @@ def main():
             fullBed.add(Bead(x, y, z, r))
 
     fullBed.moveBedtoCenter()
-    # R = fullBed.R + 0.01*meshScalingFactor ## Adding Rcyldelta
-    R = fullBed.R
-    h = fullBed.h
+    R = fullBed.R + rCylDelta ## Adding Rcyldelta
+    h = (zTop - zBot)*meshScalingFactor  + inlet + outlet
+    hBed = fullBed.h
 
     print("R:", R)
     print("h:", h)
-    print("Cylinder Volume:", fullBed.CylinderVolume)
-    print("Packed Bed Volume:", fullBed.volume())
-    print("Column Porosity:", 1-(fullBed.volume()/fullBed.CylinderVolume))
+
+    # print("Cylinder Volume:", fullBed.CylinderVolume)
+    # print("Packed Bed Volume:", fullBed.volume())
+    # print("nBeads: ", len(fullBed.beads))
+
+    cylvol = pi*R**2*h
+
     print("nBeads: ", len(fullBed.beads))
+    print("Cylinder Volume:", cylvol)
+    print("Packed Bed Volume:", fullBed.volume())
+    print("Column Porosity:", 1-(fullBed.volume()/cylvol))
+    print("Bed Porosity:", 1-(fullBed.volume()/fullBed.CylinderVolume))
 
     # # bridgeOffsetRatio = 0.95
     # bridgeOffsetRatio = sqrt(1 - relativeBridgeRadius**2)
@@ -258,25 +338,39 @@ def main():
     # print("Bridge Added Volume:", addedBridgeVol)
     # print("Capped Removed Volume:", removedBridgeVol)
 
-    sys.exit(0)
+    # sys.exit(0)
 
-    histo([bead.r for bead in fullBed.beads], 'Full Bed')
+    print("rmin:", fullBed.rmin)
+    print("rmax:", fullBed.rmax)
+    print("ravg:", fullBed.ravg)
 
-    nRegions = 100
+    volFrac, avgRads = histo([bead.r for bead in fullBed.beads], filename='psdtotal')
+
+    _,BINS = np.histogram([bead.r for bead in fullBed.beads], bins=NBINS)
+
+    print("\n--- Full Bed Histogram ---")
+    print('vol_frac:\n', volFrac,)
+    print('mean_radii:\n', avgRads)
+    print("----\n")
+
+    pickler(volFrac, os.path.expanduser('~/fullbedvolfrac.pickle'))
+    pickler(avgRads, os.path.expanduser('~/fullbedavgRads.pickle'))
+
+    nRegions = NREGIONS
     nShells = nRegions + 1 #Including r = 0
     rShells = []
 
-    # shellType = 'equiVolume'
-    shellType = 'equiRadius'
+    # shellType = 'EQUIVOLUME'
+    shellType = 'EQUIDISTANT'
 
-    if shellType == 'equiVolume':
+    if shellType == 'EQUIVOLUME':
         for n in range(nShells):
             rShells.append(R * sqrt(n/nRegions))
-    elif shellType == 'equiRadius':
+    elif shellType == 'EQUIDISTANT':
         for n in range(nShells):
             rShells.append(R * (n/nRegions))
 
-    print("rShells:", rShells)
+    # print("rShells:", rShells)
 
     volRegions = [0] * nRegions
 
@@ -285,21 +379,48 @@ def main():
     ##      map each 'i' to each process
     pool = Pool()
     parfunc = partial(volShellRegion, fullBed.beads, rShells)
-    volRegions = pool.map(parfunc, range(nRegions))
+    # volRegions = pool.map(parfunc, range(nRegions))
+    volRegions, radsRegion = zip(*pool.map(parfunc, range(nRegions)))
     pool.close()
     pool.join()
 
     # print(volShellRegion(fullBed.beads, rShells, 0))
     volRegions = [float(item) for item in volRegions]
 
-    volCylRegions = [pi * h * (rShells[i+1]**2 - rShells[i]**2) for i in range(nRegions)]
+    volCylRegions = [pi * hBed * (rShells[i+1]**2 - rShells[i]**2) for i in range(nRegions)]
     porosities = [ float(1-n/m) for n,m in zip(volRegions, volCylRegions) ]
-    avg_radius = [ (rShells[i] + rShells[i+1])/2 for i in range(nRegions) ]
+    avg_shell_radii = [ (rShells[i] + rShells[i+1])/2 for i in range(nRegions) ]
 
-    for i in range(nRegions):
-        print(avg_radius[i], volRegions[i], volCylRegions[i], porosities[i])
+    # for i in range(nRegions):
+    #     print(avg_radius[i], volRegions[i], volCylRegions[i], porosities[i])
 
-    plotter(avg_radius, porosities, '', 'plot.pdf')
+    print("\n--- Radial Porosity Distribution in Bed ---")
+    # print("avg shell radii:\n", avg_shell_radii)
+    print("porosities:\n", porosities)
+    print("---\n")
+
+    # pickler(avg_shell_radii, '~/avgshellradii.pickle')
+    pickler(porosities, os.path.expanduser('~/porosities.pickle'))
+
+    volFracs = []
+    for rads in radsRegion:
+        volFrac, avgRads = histo([float(x) for x in rads], bins=BINS)
+        volFracs.extend(volFrac)
+
+    ## flatten volFracs
+    # volFracs = [ v for sublist in volFracs for v in sublist ]
+
+    print("\n--- Particle Distribution per Shell ---")
+    print("vol_frac length (NRAD * NPARTYPE) =", len(volFracs))
+    print("avg_radii length (NPARTYPE) =", len(avgRads))
+    print("vol_frac =", volFracs)
+    print("avg_radii = ", avgRads)
+    print("---\n")
+
+    pickler(volFracs, os.path.expanduser( '~/volfracs.pickle') )
+    pickler(avgRads, os.path.expanduser( '~/avgrads.pickle') )
+
+    plotter(avg_shell_radii, porosities, '', 'por_rad.pdf')
 
 
 def volShellRegion(beads, rShells, i):
@@ -307,12 +428,33 @@ def volShellRegion(beads, rShells, i):
     Find the intersection volumes between rShells[i] & rShells[i+1]
     """
     volShell=0
+    radsShell=[]
     for bead in beads:
         volBead = volBeadSlice(bead, rShells[i], rShells[i+1])
         volShell = volShell + volBead
-    return volShell
+        radBead = pow(volBead/(4.0/3.0*pi), 1.0/3.0)
+        if radBead != 0:
+            radsShell.append(radBead)
+    return volShell, radsShell
+
+# def radsShellRegion(beads, rShells, i):
+#     """
+#     In order to calculate histogram for beads in individual shells.
+#     > 1. Calculate Volumes of each bead in given shell,
+#     > 2. Extrapolate "radius" from each volume, even sliced ones.
+#     > 3. Return list of radii to be used by histo()
+#     """
+#     radsShell=[]
+#     for bead in beads:
+#         volBead = volBeadSlice(bead, rShells[i], rShells[i+1])
+#         radBead = pow(volBead/(4.0/3.0*pi), 1.0/3.0)
+#         radsShell.append(radBead)
+#     return radsShell
 
 def bridgeVolumes(beads, bridgeTol, relativeBridgeRadius, bridgeOffsetRatio):
+    """
+    Find the total volume of the bridges between beads
+    """
     addedBridgeVol = 0
     removedBridgeVol = 0
     count = 0
@@ -371,6 +513,6 @@ def plotter(x, y, title, filename):
 
 
 if __name__ == "__main__":
-    print(sys.version)
-    print(__doc__)
+    # print(sys.version)
+    # print(__doc__)
     main()
