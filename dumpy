@@ -16,6 +16,8 @@
 # DONE: in unchunked files, don't append 0 to output filename
 # DONE: Handle packing file and particle diameter scaling? Scale every nth value (scale-step?) by sf (scale-factor
 
+# TODO: Create or Fill files with values (zeroes, custom values etc) for testing
+
 # DONE: matplotlib for top view/side view of column?
 
 from __future__ import print_function
@@ -78,6 +80,8 @@ def print_data(arr, n, vartype):
     # for item in arr:
     #     print(item)
 
+
+
 def grouper(iterable, n):
     it = iter(iterable)
     while True:
@@ -99,6 +103,9 @@ def scatterPlot(x, y):
     # plt.show()
 
 def calcFinalScalingFactor(filename):
+    """
+    Newly generated meshes with packinggenerator are out of scale, beads need to be unshrunk.
+    """
     data = {}
     with open(filename) as fp:
         for line in fp:
@@ -115,20 +122,24 @@ def calcFinalScalingFactor(filename):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("-p", "--plot", action='store_true', help="Plot X Y as scatter plot")
+    ap.add_argument("--plot", action='store_true', help="Plot X Y as scatter plot")
+    ap.add_argument("-p", "--print", action='store_true', help="Print to STDOUT")
     ap.add_argument("-a", "--ascii_input", action='store_true', help="input is ascii file")
     ap.add_argument("-v", "--vartype", help="type of variable stored (d | i)", default='d')
     ap.add_argument("-e", "--endianness", help="> or <", default='>')
     ap.add_argument("-n", "--ndf", help="number of items per row", default=1, type=int)
     ap.add_argument("-s", "--split", help="split file into pieces", default = 1, type=int)
     ap.add_argument("-w", "--write", help="write to bin file")
-    ap.add_argument("-ss", "--scale-step", help="scale every scale-step'th value by scale-factor", default=1, type=int)
-    ap.add_argument("-sf", "--scale-factor", help="scale every scale-step'th value by scale-factor", default=1, type=float)
+    ap.add_argument("-so", "--scale-offset", help="Scale every ndf'th number starting from scale-offset. Index starts from 0.", default=0, type=int)
+    ap.add_argument("-sf", "--scale-factor", help="Scale every ndf'th number starting from scale-offset.", default=1, type=float)
     ap.add_argument("-z", "--zero-pad", action='store_true', help="Pre-pad file with zeroes")
-    ap.add_argument("-d", "--double", action='store_true', help="Double the file. Useful for converting semi-discrete to space-time data.")
+    ap.add_argument("-d", "--double", action='store_true', help="Double the file. Useful for converting semi-discrete to space-time data, although cat is better.")
+    ap.add_argument("-f", "--fill", nargs=2, default = [0, 0], help="Fill the given file with values")
     ap.add_argument("--dpacking", action='store_true', help="Input file is packing.xyzd with e=< and n=4 v=d.")
     ap.add_argument("--fpacking", action='store_true', help="Input file is packing.xyzd with e=< and n=4 v=f.")
     ap.add_argument("--nfo", help="Read newly generated packing data and calculate final scaling factor from NFO file.")
+    ap.add_argument("--norm", help="Norm order")
+    ap.add_argument("--norm-var", help="Calculate Norm for this variable. Index starts at 0.")
     ap.add_argument("FILES", nargs='*', help="files")
     args = vars(ap.parse_args())
 
@@ -146,7 +157,7 @@ def main():
 
     if args['nfo']:
         final_scaling_factor = calcFinalScalingFactor(args['nfo'])
-        args['scale_step'] = 4
+        args['scale_offset'] = 3
         args['scale_factor'] = final_scaling_factor
 
     vartype = args['vartype']
@@ -154,12 +165,13 @@ def main():
     endianness = args['endianness']
     dataformat = endianness + vartype
 
-    scale_step = args['scale_step']
+    scale_offset= args['scale_offset']
     scale_factor = args['scale_factor']
 
     infiles = args['FILES']
 
-
+    # if args['fill']:
+    #     args['write'] = args['FILES']
 
     # split = 1
     # if args['split']:
@@ -176,11 +188,21 @@ def main():
         else:
             array = bin_to_arr(infile, dataformat)
 
-        ## Apply scale_factor to every scale_step'th number
-        ## Can scale X, Y, Z, or R/D individually or everything at once
-        array[scale_step-1::scale_step] = [x*scale_factor for x in array[scale_step-1::scale_step]]
+        ## Apply scale_factor to every ndf'th number
+        ## Best for scaling the last variable (step = n), or the entire column (step = 1)
+        array[scale_offset::args['ndf']] = [x*scale_factor for x in array[scale_offset::args['ndf']]]
 
-        # Modify
+        normDict = {
+                '2':2,
+                'max': np.inf,
+                'fro': 'fro'
+                }
+
+        if args['norm_var']:
+            norm = np.linalg.norm(array[ int(args['norm_var']):: int(args['ndf']) ], ord=normDict[args['norm']])
+            print(args['norm'], "norm of var at pos", args['norm_var'], "is", norm)
+
+        # Modifications
         zero_array = [ 0 for item in array ]
         if args['zero_pad']:
             array = zero_array + array
@@ -188,24 +210,35 @@ def main():
         if args['double']:
             array = array + array
 
+        if args['fill']:
+            if(vartype == 'i'):
+                dummy = [ int(args['fill'][0]) ]
+            elif(vartype == 'f'):
+                dummy = [ float(args['fill'][0]) ]
+            elif(vartype == 'd'):
+                dummy = [ float(args['fill'][0]) ]
+            array.extend( dummy * args['ndf']*int(args['fill'][1]))
 
         # to split the file into chunks
         out_arrays = []
         out_arrays = np.array_split(np.array(array), args['split'])
 
         # Output to STDOUT
-        for arr in out_arrays:
-            print_data(arr, ndf, vartype)
+        if args['print']:
+            for arr in out_arrays:
+                print_data(arr, ndf, vartype)
 
         # Write to BIN output file
         if args['write']:
             if len(out_arrays) > 1:
-                for count, arr, in enumerate(out_arrays):
+                for count, arr in enumerate(out_arrays):
                     writeoutfile = args['write'] + str(count)
                     arr_to_bin(arr, writeoutfile, dataformat)
             else:
-                arr_to_bin(arr, args['write'], dataformat)
+                # arr_to_bin(arr, args['write'], dataformat)
+                arr_to_bin(out_arrays[0], args['write'], dataformat)
 
+        # To quickly plot a packing to see if it's square/cylindrical, and ordered/random
         if args['plot']:
             for arr in out_arrays:
                 x = [ arr[i] for i in range(len(arr)) if i%4 == 0 ]
@@ -213,5 +246,5 @@ def main():
                 scatterPlot(x,y)
 
 if __name__ == "__main__":
-    print(__doc__)
+    # print(__doc__)
     main()
