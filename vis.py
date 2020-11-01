@@ -43,6 +43,12 @@ import csv
 import pickle
 import struct
 
+# from multiprocessing_for_kids import doMultiprocessingLoop
+# from multiprocessing import Pool
+# from pathos.multiprocessing import ProcessingPool as Pool
+from functools import partial
+# from itertools import repeat
+
 # import h5py ##NOTE: Is perhaps better as a standard format, but issue with the version of paraview compiled locally at time of scripting. So working with bin files.
 
 def MIXDReader():
@@ -76,6 +82,7 @@ def csvWriter(filename, x, y):
 ## TODO: Test written bin in mpi mode
 def bead_loading(reader, **kwargs):
     colorVars = kwargs.get('colorVars', reader.PointArrayStatus) or reader.PointArrayStatus
+    files = kwargs.get('files')
 
     try:
         timeKeeper = GetTimeKeeper()
@@ -120,11 +127,13 @@ def bead_loading(reader, **kwargs):
         # coordArr[index,:] = np.array([x, y, z, r])
         appendToBin([x,y,z,r],'bead_loading.xyzr', '=d')
 
+
     for timestep in range(nts):
         timeKeeper.Time = timestep
         print("Processing timestep: ", timestep, end="\r")
 
         for index in range(nbeads):
+
             threshold = Threshold(Input=connectivity)
             threshold.ThresholdRange = [index, index]
             thresholdDisplay = Show(threshold, renderView1)
@@ -140,9 +149,12 @@ def bead_loading(reader, **kwargs):
                 value = ns.vtk_to_numpy(value)
                 values.append(value[0])
 
-            # dataArr[timestep,index,:] = np.array(values)
-            # f['data'][timestep,index,:] = np.array(values)
-            appendToBin(values,'bead_loading.dat', '=d')
+            dataArr[timestep,index,:] = np.array(values)
+            # appendToBin(values, 'bead_' + str(index) + '.dat', "=d")
+            Hide(threshold, renderView1)
+
+        # appendToBin(dataArr[timestep,:,:], 'ts_' + str(timestep) + '.dat', "=d")
+        appendToBin(dataArr[timestep,:,:], files[0] + '.dat', "=d")
 
     # ## FIXED: Append to binary inside loop instead
     # ## Save data for further processing. Pickle?
@@ -150,6 +162,27 @@ def bead_loading(reader, **kwargs):
     # pickler(dataArr, 'bead.dataArr.pickle')
     # pickler(coordArr, 'bead.coordArr.pickle')
     # print(dataArr.size, coordArr.size)
+
+def calc_beads_loading(connectivity, colorVars, dataArr, nbeads):
+    for index in range(nbeads):
+
+        threshold = Threshold(Input=connectivity)
+        threshold.ThresholdRange = [index, index]
+        thresholdDisplay = Show(threshold, renderView1)
+        # threshold.UpdatePipeline()
+
+        integrated = IntegrateVariables(Input=threshold)
+        intdata = servermanager.Fetch(integrated)
+        intdata = dsa.WrapDataObject(intdata)
+
+        values = []
+        for colorVar in colorVars:
+            value = intdata.PointData[colorVar]
+            value = ns.vtk_to_numpy(value)
+            values.append(value[0])
+
+        # dataArr[timestep,index,:] = np.array(values)
+        appendToBin(values, 'bead_' + str(index) + '.dat', "=d")
 
 def mass_flux(reader, **kwargs):
     scalarBarVisible = kwargs.get('scalarBarVisible', True)
@@ -445,7 +478,8 @@ def main():
 
     if args['bead_loading']:
         bead_loading(reader,
-                colorVars = args['colorVars']
+                colorVars = args['colorVars'],
+                files = args['FILES']
                 )
 
     if args['writer']:
