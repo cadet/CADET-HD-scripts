@@ -1,6 +1,6 @@
 #!/bin/python3
 
-# depends on the mplstyle files from https://github.com/garrettj403/SciencePlots
+# NOTE: depends on the mplstyle files from https://github.com/garrettj403/SciencePlots
 # Usage: ./plotChrom.py <file> <file>
 # Output: plot.pdf and plot.jpg
 
@@ -14,13 +14,13 @@ def normalize(data):
 def rescale(data, factor):
     return [x*factor for x in data]
 
-def readChromatogram(data_path):
+def readChromatogram(data_path, delimiter):
     time= []
     conc= []
     with open(data_path, newline='') as csvfile:
         # data = list(csv.reader(csvfile))
         for line in csvfile:
-            data_line = line.strip().split(' ')
+            data_line = line.strip().split(delimiter)
             data_line = list(filter(None, data_line))
             if (data_line != []):
                 time.append(float(data_line[0]))
@@ -57,6 +57,10 @@ ap.add_argument("-r", "--rescale", type=float, required=False,
         help="Rescale graph with multiplicative factor (1/holdup-ratio)")
 ap.add_argument("-sr", "--save-rescaled", required=False, action='store_true',
         help="File to save rescaled data")
+ap.add_argument("--csv", required=False, action='store_true',
+        help="input is csv file instead of default space separated")
+ap.add_argument("--to-csv", required=False, action='store_true',
+        help="save as csv")
 args = vars(ap.parse_args())
 
 if not args['labels']:
@@ -74,6 +78,10 @@ if not args['markers']:
 elif len(args['markers']) == 1:
     args['markers'] = args['markers'] * len(args['files'])
 
+if args['csv']:
+    delimiter = ','
+else:
+    delimiter = ' '
 
 with plt.style.context(['science']):
     fig, ax = plt.subplots()
@@ -82,14 +90,14 @@ with plt.style.context(['science']):
     lines = []
     count =0
     for filename,label,linestyle,marker in zip(args['files'], args['labels'], args['linestyles'], args['markers']):
-        x, y = readChromatogram(filename)
+        x, y = readChromatogram(filename, delimiter)
         if args['normalize']:
             y = normalize(y)
         if args['rescale']:
             x = rescale(x, args['rescale'])
         line = ax.plot(x, y, label=label, marker=marker, linestyle=linestyle)
         if args['fill']:
-            ax.fill_between(x, y, 0, interpolate=True)
+            ax.fill_between(x, y, 1, interpolate=True)
         xs.append(x)
         ys.append(y)
         lines.append(line)
@@ -112,6 +120,13 @@ with plt.style.context(['science']):
     if args['save_rescaled']:
         import csv
         for filename,x,y in zip(args['files'], xs, ys):
-            with open(filename+'_postscaled', 'w') as f:
-                writer = csv.writer(f, delimiter=' ')
+            with open(filename+'-postscaled', 'w') as f:
+                writer = csv.writer(f, delimiter=delimiter)
+                writer.writerows(zip(x, y))
+
+    if args['to_csv']:
+        import csv
+        for filename,x,y in zip(args['files'], xs, ys):
+            with open(filename+'.csv', 'w') as f:
+                writer = csv.writer(f, delimiter=',')
                 writer.writerows(zip(x, y))

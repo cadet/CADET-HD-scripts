@@ -13,8 +13,8 @@
 # DONE: implement use of histo
 # INPROGRESS: Documentation
 # DONE: Generate results for CADET input: binned radii & volume fractions
-# TODO: argparse, argument handling
-# TODO: read genmesh input file??
+# DONE: argparse, argument handling
+# DONE: read genmesh input file??
 # TODO: Handle rho == eta edge cases
 # TODO: Auto handle scaling_factor: (Updatebounds, scale to fit Cyl Radius = 5)
 # TODO: Better parallelization?
@@ -34,8 +34,17 @@ import pickle
 import os.path
 
 
-NBINS=20                   ## NPARTYPE in CADET
-NREGIONS = 40               ## NRAD in CADET
+# NBINS    = 20                   ## NPARTYPE in CADET
+# NREGIONS = 100                   ## NRAD in CADET
+
+NBINS    = 10                   ## NPARTYPE in CADET
+NREGIONS = 20                   ## NRAD in CADET
+
+def csvWriter(filename, x, y):
+    import csv
+    with open(filename, 'w') as f:
+        writer = csv.writer(f)
+        writer.writerows(zip(x, y))
 
 class Bead:
     """Class for individual beads"""
@@ -353,8 +362,8 @@ def main():
     print('mean_radii:\n', avgRads)
     print("----\n")
 
-    pickler(volFrac, os.path.expanduser('~/fullbedvolfrac.pickle'))
-    pickler(avgRads, os.path.expanduser('~/fullbedavgRads.pickle'))
+    # pickler(volFrac, os.path.expanduser('~/fullbedvolfrac.pickle'))
+    # pickler(avgRads, os.path.expanduser('~/fullbedavgRads.pickle'))
 
     nRegions = NREGIONS
     nShells = nRegions + 1 #Including r = 0
@@ -399,8 +408,8 @@ def main():
     print("porosities:\n", porosities)
     print("---\n")
 
-    # pickler(avg_shell_radii, '~/avgshellradii.pickle')
-    pickler(porosities, os.path.expanduser('~/porosities.pickle'))
+    ######## pickler(avg_shell_radii, '~/avgshellradii.pickle')
+    # pickler(porosities, os.path.expanduser('~/porosities.pickle'))
 
     volFracs = []
     for rads in radsRegion:
@@ -417,10 +426,11 @@ def main():
     print("avg_radii = ", avgRads)
     print("---\n")
 
-    pickler(volFracs, os.path.expanduser( '~/volfracs.pickle') )
-    pickler(avgRads, os.path.expanduser( '~/avgrads.pickle') )
+    # pickler(volFracs, os.path.expanduser( '~/volfracs.pickle') )
+    # pickler(avgRads, os.path.expanduser( '~/avgrads.pickle') )
 
     plotter(avg_shell_radii, porosities, '', 'por_rad.pdf')
+    csvWriter('por_rad.csv', avg_shell_radii, porosities)
 
 
 def volShellRegion(beads, rShells, i):
