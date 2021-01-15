@@ -14,9 +14,14 @@ def normalize(data):
 def rescale(data, factor):
     return [x*factor for x in data]
 
-def readChromatogram(data_path, delimiter):
+# def readChromatogram(data_path, delimiter):
+def readChromatogram(data_path):
     time= []
     conc= []
+    delimiter = ' '
+    with open(data_path, newline='') as csvfile:
+        if ',' in csvfile.readline():
+            delimiter = ','
     with open(data_path, newline='') as csvfile:
         # data = list(csv.reader(csvfile))
         for line in csvfile:
@@ -51,14 +56,16 @@ ap.add_argument("-n", "--normalize", required=False, action='store_true',
         help="normalize y data to the last value")
 ap.add_argument("-nl", "--no-legend", required=False, action='store_true',
         help="don't show legend")
+ap.add_argument("--legend", required=False, nargs=3, default=['upper center', '0.5', '-0.2'], type=str,
+        help="Legend settings: --legend <location> <bbox_to_anchor>")
 ap.add_argument("-o", "--output", required=False,
         help="output file")
 ap.add_argument("-r", "--rescale", type=float, required=False,
         help="Rescale graph with multiplicative factor (1/holdup-ratio)")
 ap.add_argument("-sr", "--save-rescaled", required=False, action='store_true',
         help="File to save rescaled data")
-ap.add_argument("--csv", required=False, action='store_true',
-        help="input is csv file instead of default space separated")
+# ap.add_argument("--csv", required=False, action='store_true',
+#         help="input is csv file instead of default space separated")
 ap.add_argument("--to-csv", required=False, action='store_true',
         help="save as csv")
 args = vars(ap.parse_args())
@@ -78,10 +85,10 @@ if not args['markers']:
 elif len(args['markers']) == 1:
     args['markers'] = args['markers'] * len(args['files'])
 
-if args['csv']:
-    delimiter = ','
-else:
-    delimiter = ' '
+# if args['csv']:
+#     delimiter = ','
+# else:
+#     delimiter = ' '
 
 with plt.style.context(['science']):
     fig, ax = plt.subplots()
@@ -90,7 +97,8 @@ with plt.style.context(['science']):
     lines = []
     count =0
     for filename,label,linestyle,marker in zip(args['files'], args['labels'], args['linestyles'], args['markers']):
-        x, y = readChromatogram(filename, delimiter)
+        # x, y = readChromatogram(filename, delimiter)
+        x, y = readChromatogram(filename)
         if args['normalize']:
             y = normalize(y)
         if args['rescale']:
@@ -103,7 +111,8 @@ with plt.style.context(['science']):
         lines.append(line)
         count+=1
     if not args['no_legend']:
-        legend = ax.legend(loc='best', shadow=True)
+        # legend = ax.legend(loc='best', shadow=True)
+        legend = ax.legend(loc=args['legend'][0], bbox_to_anchor=(float(args['legend'][1]),float(args['legend'][2])), shadow=True)
     ax.set(title=args['title'])
     ax.set(xlabel=args['xlabel'])
     ax.set(ylabel=args['ylabel'])
