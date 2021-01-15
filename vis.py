@@ -26,28 +26,23 @@ Usage notes:
 ## DONE: Parametrize view size geometry
 ## TODO: config.json file
 ## TODO: Parametrize background color
-## TODO: fix timestep data (probably in mixd2pvtu)
+## TODO: fix timestep data to be handled in from pvtu file? (in mixd2pvtu)
 ## TODO: rotated views [Good for image resolution in long columns]
 ## DONE: After updatescalarbars() they are always visible even with -nsb
 
 import argparse
+from matplotlib import pyplot as plt
 from paraview.simple import *
 paraview.simple._DisableFirstRenderCameraReset()
 from vtkmodules.numpy_interface import dataset_adapter as dsa
 import vtk.util.numpy_support as ns
+from math import asin,sqrt,pi
 import numpy as np
-from matplotlib import pyplot as plt
-import os
-import sys
-import csv
 import pickle
 import struct
-
-# from multiprocessing_for_kids import doMultiprocessingLoop
-# from multiprocessing import Pool
-# from pathos.multiprocessing import ProcessingPool as Pool
-from functools import partial
-# from itertools import repeat
+import sys
+import csv
+import os
 
 # import h5py ##NOTE: Is perhaps better as a standard format, but issue with the version of paraview compiled locally at time of scripting. So working with bin files.
 
@@ -122,7 +117,7 @@ def bead_loading(reader, **kwargs):
         x = (xmax + xmin)/2
         y = (ymax + ymin)/2
         z = (zmax + zmin)/2
-        r = (xmax - xmin + ymax - ymin + zmax - zmin)/2
+        r = (xmax - xmin + ymax - ymin + zmax - zmin)/6
         # print("xyzr:",x, y, z, r)
         # coordArr[index,:] = np.array([x, y, z, r])
         appendToBin([x,y,z,r],'bead_loading.xyzr', '=d')
@@ -381,6 +376,103 @@ def animate(reader, **kwargs):
         projectionDisplay.SetScalarBarVisibility(renderView1, scalarBarVisible)
         SaveAnimation(colorVar + '.png', renderView1, ImageResolution=geometry, TransparentBackground=1, SuffixFormat='.%04d')
 
+
+def radial_shell_integrate(reader, **kwargs):
+
+    # projectionType = kwargs.get('projectionType', 'clip')
+    scalarBarVisible = kwargs.get('scalarBarVisible', True)
+    axisVisible = kwargs.get('axisVisible', True)
+    geometry = kwargs.get('geometry')
+    colorVars = kwargs.get('colorVars', reader.PointArrayStatus) or reader.PointArrayStatus
+    zoom = kwargs.get('zoom')
+    nRegions = kwargs.get('nRegions')
+
+    # rShells = [0, 1e-5, 2e-5, 3e-5, 4e-5, 5e-5]
+
+    ## Calc bounding box. Requires show
+    renderView1 = GetActiveViewOrCreate('RenderView')
+    display = Show(reader, renderView1)
+    (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+    Hide(reader, renderView1)
+
+    # nRegions = 3
+    nShells = nRegions + 1 #Including r = 0
+    rShells = []
+
+    R = (xmax - xmin + ymax - ymin)/4
+    print("R:", R)
+
+    shellType = 'EQUIDISTANT'
+    # shellType = 'EQUIVOLUME'
+    if shellType == 'EQUIVOLUME':
+        for n in range(nShells):
+            rShells.append(R * sqrt(n/nRegions))
+    elif shellType == 'EQUIDISTANT':
+        for n in range(nShells):
+            rShells.append(R * (n/nRegions))
+
+    print("rShells:", rShells)
+
+    appended = []
+    radAvg = []
+
+    for radIn, radOut in zip(rShells[:-1], rShells[1:]+rShells[:0]):
+
+        radAvg.append( (radIn + radOut) / 2 )
+
+        clipOuter = Clip(Input=reader)
+        clipOuter.ClipType = 'Cylinder'
+        clipOuter.ClipType.Axis = [0.0, 0.0, 1.0]
+        clipOuter.ClipType.Radius = radOut
+        Hide3DWidgets(proxy=clipOuter.ClipType)
+
+        # renderView1 = GetActiveViewOrCreate('RenderView')
+        # projectionDisplay = Show(clipOuter, renderView1)
+        # projectionDisplay.Representation = 'Surface'
+        # # projectionDisplay.Representation = 'Surface With Edges'
+        # renderView1.OrientationAxesVisibility = int(axisVisible)
+        # projectionDisplay.RescaleTransferFunctionToDataRange()
+
+        clipInner = Clip(Input=clipOuter)
+        clipInner.ClipType = 'Cylinder'
+        clipInner.ClipType.Axis = [0.0, 0.0, 1.0]
+        clipInner.ClipType.Radius = radIn
+        clipInner.Invert = 0
+
+        cellSize1 = CellSize(Input=clipInner)
+        cellSize1.ComputeVolume = 1
+        cellSize1.ComputeSum = 1
+
+        volume = servermanager.Fetch(cellSize1)
+        volume = dsa.WrapDataObject(volume)
+        volume = volume.FieldData['Volume'][0]
+        print("VOLUME:", volume)
+
+        integrated = IntegrateVariables(Input=clipInner)
+        intdata = servermanager.Fetch(integrated)
+        intdata = dsa.WrapDataObject(intdata)
+
+        values = []
+        for colorVar in colorVars:
+            value = intdata.PointData[colorVar]
+            value = ns.vtk_to_numpy(value)
+            values.append(value[0]/volume) ## Average of velocity, instead of integ(v.dV)
+
+        print(values)
+        appended.extend(values)
+
+    print("Average scalar by radius:", appended)
+    csvWriter('radial_shell_integrate', radAvg, appended)
+
+
+# def chromatogram(reader, **kwargs):
+#     extractSurface1 = ExtractSurface(Input=testcase_0pvtu)
+#     generateSurfaceNormals1 = GenerateSurfaceNormals(Input=extractSurface1)
+#     threshold1 = Threshold(Input=generateSurfaceNormals1)
+#     threshold1.ThresholdRange = [1.0, 1.0]
+#     threshold1.Scalars = ['POINTS', 'Normals_Z']
+
+
 def main():
 
     ap = argparse.ArgumentParser()
@@ -391,6 +483,7 @@ def main():
     ap.add_argument("-m", "--mass-flux", required=False, help="Find mass flux at n different slices along the z direction")
     ap.add_argument("-s", "--snapshot", required=False, action='store_true', help="run snapshotter")
     ap.add_argument("-b", "--bead-loading", required=False, action='store_true', help="Output bead loading data")
+    ap.add_argument("-r", "--radial-integrate", required=False, help="Cylindrical shell integrate variables")
 
     ap.add_argument("-c", "--colorVars", required=False, nargs='*', help="color map variable")
     ap.add_argument("-g", "--geometry", required=False, nargs=2, type=int, default=[1750, 1300], help="Animation geometry size")
@@ -481,6 +574,17 @@ def main():
                 colorVars = args['colorVars'],
                 files = args['FILES']
                 )
+
+    if args['radial_integrate']:
+        radial_shell_integrate( reader,
+                scalarBarVisible = not args['no_scalar_bar'],
+                geometry = args['geometry'],
+                axisVisible = not args['no_coordinate_axis'],
+                zoom = args['zoom'],
+                colorVars = args['colorVars'],
+                nRegions = int(args['radial_integrate'])
+                )
+
 
     if args['writer']:
         writer=None
