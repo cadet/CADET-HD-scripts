@@ -10,6 +10,7 @@
     $ dumpy two-spheres.ascii -v f -e '<' -w two-spheres.xyzd -a
     $ dumpy two-spheres.xyzd0 -v f -e '<' -p
     $ dumpy --packing packing.xyzd --nfo packing.nfo -w fixed.xyzd
+    $ dumpy dummy --fill <value> <n_nodes> -n <ndf> -w dummy -v <vartype>
 """
 
 # TODO: assert array element sizes before writing (int: 4 bytes, float: 4 bytes, double: 8 bytes)
@@ -193,6 +194,9 @@ def main():
         array[scale_offset::args['ndf']] = [x*scale_factor for x in array[scale_offset::args['ndf']]]
 
         normDict = {
+                '0':0,
+                'avg': 0,
+                '1':1,
                 '2':2,
                 'max': np.inf,
                 'fro': 'fro'
@@ -201,6 +205,10 @@ def main():
         if args['norm_var']:
             norm = np.linalg.norm(array[ int(args['norm_var']):: int(args['ndf']) ], ord=normDict[args['norm']])
             print(args['norm'], "norm of var at pos", args['norm_var'], "is", norm)
+            if args['norm'] == 'avg':
+                asum = sum(array[int(args['norm_var']) :: int(args['ndf']) ])
+                alen = len(array[int(args['norm_var']) :: int(args['ndf']) ])
+                print("Average of var[%s] over %d values is %f" % (args['norm_var'], alen, asum/alen ) )
 
         # Modifications
         zero_array = [ 0 for item in array ]
