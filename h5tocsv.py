@@ -33,7 +33,7 @@ for f in args['files']:
         y = sim.root.output.solution
         for item in var:
             y = y[item]
-        if y == [] or y == {}:
+        if len(y) == 0:
             continue
         with open(f + '.' + varstring.replace('/', '_') +'.csv', 'w') as f:
             writer = csv.writer(f, delimiter=',')
