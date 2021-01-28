@@ -122,6 +122,9 @@ def bead_loading(reader, **kwargs):
         # coordArr[index,:] = np.array([x, y, z, r])
         appendToBin([x,y,z,r],'bead_loading.xyzr', '=d')
 
+    bead_fds = []
+    for bead in range(nbeads):
+        bead_fds.append(open('bead_' + str(bead), 'ab'))
 
     for timestep in range(nts):
         timeKeeper.Time = timestep
@@ -144,19 +147,16 @@ def bead_loading(reader, **kwargs):
                 value = ns.vtk_to_numpy(value)
                 values.append(value[0])
 
-            dataArr[timestep,index,:] = np.array(values)
-            # appendToBin(values, 'bead_' + str(index) + '.dat', "=d")
+            # dataArr[timestep,index,:] = np.array(values)
+
+            for value in values:
+                bead_fds[index].write(struct.pack("=d",value))
+
             Hide(threshold, renderView1)
 
+        # TODO: this only works with one scalar currently, which is okay for now
         # appendToBin(dataArr[timestep,:,:], 'ts_' + str(timestep) + '.dat', "=d")
-        appendToBin(dataArr[timestep,:,:], files[0] + '.dat', "=d")
 
-    # ## FIXED: Append to binary inside loop instead
-    # ## Save data for further processing. Pickle?
-    # print("Pickling data...")
-    # pickler(dataArr, 'bead.dataArr.pickle')
-    # pickler(coordArr, 'bead.coordArr.pickle')
-    # print(dataArr.size, coordArr.size)
 
 def calc_beads_loading(connectivity, colorVars, dataArr, nbeads):
     for index in range(nbeads):
@@ -490,6 +490,7 @@ def main():
     ap.add_argument("-z", "--zoom", required=False, nargs=3, type=float, default=[1, 1, 1], help="Zoom factors for snapshot")
     ap.add_argument("-nsb", "--no-scalar-bar", required=False, action='store_true', default=False, help="Disable scalar bar visibility")
     ap.add_argument("-nca", "--no-coordinate-axis", required=False, action='store_true', default=False, help="Disable coordinate axis visibility")
+    ap.add_argument("-css", "--cross-section-snapshots", type=int, required=False, help="Run snapshotter for n cross section slices")
 
     ap.add_argument("-f", "--filetype", required=False, default='pvtu', choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="filetype: xdmf | vtu | vtk | pvtu")
     ap.add_argument("-w", "--writer", required=False, choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="writer: xdmf | vtu | vtk | pvtu")
@@ -585,6 +586,17 @@ def main():
                 nRegions = int(args['radial_integrate'])
                 )
 
+    if args['cross_section_snapshots']:
+        cross_section_snapshots(reader,
+                scalarBarVisible = not args['no_scalar_bar'],
+                geometry = args['geometry'],
+                axisVisible = not args['no_coordinate_axis'],
+                zoom = args['zoom'],
+                colorVars = args['colorVars'],
+                nSlice = args['cross_section_snapshots'],
+                files = args['FILES']
+                )
+
 
     if args['writer']:
         writer=None
@@ -606,6 +618,83 @@ def main():
         writer.Timestepstride = 1
         writer.FileName = 'script-output'
         writer.UpdatePipeline()
+
+def cross_section_snapshots(reader, **kwargs):
+    scalarBarVisible = kwargs.get('scalarBarVisible', True)
+    geometry = kwargs.get('geometry', [1750, 1300])
+    axisVisible = kwargs.get('axisVisible', True)
+    colorVars = kwargs.get('colorVars', reader.PointArrayStatus) or reader.PointArrayStatus
+    nSlice = kwargs.get('nSlice', 1) or 1
+    files = kwargs.get('files')
+
+
+    renderView1 = GetActiveViewOrCreate('RenderView')
+    display = Show(reader, renderView1)
+    # display.Representation = 'Surface With Edges'
+
+    (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+    print(xmin,xmax,ymin,ymax,zmin,zmax)
+
+    Hide(reader, renderView1)
+
+    ## NOTE: Only takes takes one color
+    colorVar = colorVars[0]
+    flowrate = []
+    zs = []
+
+    count = 0
+
+    try:
+        ## Set timestep to last timestep (last file in series)
+        timeKeeper = GetTimeKeeper()
+        timeKeeper.Time = reader.TimestepValues[-1]
+    except:
+        pass
+
+    for zpos in np.linspace(zmin, zmax, nSlice):
+
+        count = count + 1
+        print("Loop: ", count, zpos)
+        projection = Slice(Input=reader)
+        Hide3DWidgets(proxy=projection.SliceType)
+
+        projection.SliceType = 'Plane'
+        projection.HyperTreeGridSlicer = 'Plane'
+        projection.SliceOffsetValues = [0.0]
+
+        projection.SliceType.Origin = [0.0, 0.0, zpos]
+        projection.SliceType.Normal = [0.0, 0.0, -1.0]
+        projection.UpdatePipeline()
+
+        projectionDisplay = Show(projection, renderView1)
+        projectionDisplay.Representation = 'Surface'
+        # projectionDisplay.Representation = 'Surface With Edges'
+        renderView1.OrientationAxesVisibility = int(axisVisible)
+        projectionDisplay.RescaleTransferFunctionToDataRange()
+
+        renderView1.Update()
+        renderView1.ViewSize = geometry
+        renderView1.ResetCamera()
+
+        ColorBy(projectionDisplay, ('POINTS', colorVar))
+        projectionDisplay.RescaleTransferFunctionToDataRange()
+
+        wLUT = GetColorTransferFunction(colorVar)
+        wPWF = GetOpacityTransferFunction(colorVar)
+        HideScalarBarIfNotNeeded(wLUT, renderView1)
+
+        ## NOTE: For color presets.
+        wLUT.ApplyPreset('Rainbow Uniform', True)
+
+        renderView1.Update()
+        UpdateScalarBars()
+
+        projectionDisplay.SetScalarBarVisibility(renderView1, scalarBarVisible)
+
+        SaveScreenshot(colorVar + '_' + str(count)+'.png', renderView1, ImageResolution=[1750, 1300], TransparentBackground=1)
+
+        Hide(projection, renderView1)
+
 
 
 if __name__ == "__main__":
