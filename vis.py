@@ -127,10 +127,11 @@ def bead_loading(reader, **kwargs):
 
     for timestep in range(nts):
         timeKeeper.Time = timestep
-        print("Processing timestep: ", timestep, end="\r")
+        # print("Processing timestep: ", timestep, end="\r")
 
         for index in range(nbeads):
 
+            print("Processing timestep:", timestep, "| bead:", index, end="\r")
             threshold = Threshold(Input=connectivity)
             threshold.ThresholdRange = [index, index]
             thresholdDisplay = Show(threshold, renderView1)
@@ -148,6 +149,10 @@ def bead_loading(reader, **kwargs):
 
             dataArr[timestep,index,:] = np.array(values)
             Hide(threshold, renderView1)
+
+            Delete(integrated)
+            Delete(thresholdDisplay)
+            Delete(threshold)
 
         # TODO: this only works with one scalar currently, which is okay for now
         appendToBin(dataArr[timestep,:,:], 'ts_' + str(timestep) + '.dat', "=d")
@@ -173,6 +178,9 @@ def calc_beads_loading(connectivity, colorVars, dataArr, nbeads):
 
         # dataArr[timestep,index,:] = np.array(values)
         appendToBin(values, 'bead_' + str(index) + '.dat', "=d")
+
+        Delete(threshold)
+        del(threshold)
 
 def mass_flux(reader, **kwargs):
     scalarBarVisible = kwargs.get('scalarBarVisible', True)
