@@ -1,5 +1,7 @@
 #!/bin/env -S pvpython --force-offscreen-rendering
 
+## https://www.paraview.org/Wiki/ParaView_and_Python#Control_the_camera
+
 """
 A Paraview script to aid the postprocessing of data. I wrote it mainly to generate images out of output files.
 
@@ -29,6 +31,7 @@ Usage notes:
 ## TODO: fix timestep data to be handled in from pvtu file? (in mixd2pvtu)
 ## TODO: rotated views [Good for image resolution in long columns]
 ## DONE: After updatescalarbars() they are always visible even with -nsb
+## TODO: Allow modularity/composability of functions in operating modes
 
 import argparse
 from matplotlib import pyplot as plt
@@ -122,10 +125,6 @@ def bead_loading(reader, **kwargs):
         # coordArr[index,:] = np.array([x, y, z, r])
         appendToBin([x,y,z,r],'bead_loading.xyzr', '=d')
 
-    bead_fds = []
-    for bead in range(nbeads):
-        bead_fds.append(open('bead_' + str(bead), 'ab'))
-
     for timestep in range(nts):
         timeKeeper.Time = timestep
         print("Processing timestep: ", timestep, end="\r")
@@ -147,15 +146,11 @@ def bead_loading(reader, **kwargs):
                 value = ns.vtk_to_numpy(value)
                 values.append(value[0])
 
-            # dataArr[timestep,index,:] = np.array(values)
-
-            for value in values:
-                bead_fds[index].write(struct.pack("=d",value))
-
+            dataArr[timestep,index,:] = np.array(values)
             Hide(threshold, renderView1)
 
         # TODO: this only works with one scalar currently, which is okay for now
-        # appendToBin(dataArr[timestep,:,:], 'ts_' + str(timestep) + '.dat', "=d")
+        appendToBin(dataArr[timestep,:,:], 'ts_' + str(timestep) + '.dat', "=d")
 
 
 def calc_beads_loading(connectivity, colorVars, dataArr, nbeads):
@@ -282,19 +277,22 @@ def snapshot(reader, **kwargs):
 
     renderView1 = GetActiveViewOrCreate('RenderView')
     display = Show(reader, renderView1)
-    # display.Representation = 'Surface'
-    display.Representation = 'Surface With Edges'
+    display.Representation = 'Surface'
+    # display.Representation = 'Surface With Edges'
     renderView1.OrientationAxesVisibility = int(axisVisible)
     # display.RescaleTransferFunctionToDataRange()
 
     renderView1.Update()
     renderView1.ResetCamera()
     renderView1.ViewSize = geometry
-    renderView1.CameraPosition = [0.0005945160428284565, 1.959300980464672e-13, -1.3552527156068805e-20]
-    renderView1.CameraFocalPoint = [-2.549999918319142e-05, 1.959300980464672e-13, -1.3552527156068805e-20]
-    renderView1.CameraViewUp = [0.0, 0.0, 1.0]
-    renderView1.CameraParallelScale = 0.00016047195994169908
-    renderView1.ResetCamera()
+
+    setCameraOrientation()
+
+    # renderView1.CameraPosition = [0.0005945160428284565, 1.959300980464672e-13, -1.3552527156068805e-20]
+    # renderView1.CameraFocalPoint = [-2.549999918319142e-05, 1.959300980464672e-13, -1.3552527156068805e-20]
+    # renderView1.CameraViewUp = [0.0, 0.0, 1.0]
+    # renderView1.CameraParallelScale = 0.00016047195994169908
+    # renderView1.ResetCamera()
 
     cam = GetActiveCamera()
     cx,cy,cz = cam.GetPosition()
@@ -343,19 +341,12 @@ def animate(reader, **kwargs):
     renderView1 = GetActiveViewOrCreate('RenderView')
     projectionDisplay = Show(projection, renderView1)
     projectionDisplay.Representation = 'Surface'
-    # projectionDisplay.Representation = 'Surface With Edges'
     renderView1.OrientationAxesVisibility = int(axisVisible)
     projectionDisplay.RescaleTransferFunctionToDataRange()
-
-
-    renderView1.Update()
-    renderView1.ResetCamera()
     renderView1.ViewSize = geometry
-    renderView1.CameraPosition = [0.0005945160428284565, 1.959300980464672e-13, -1.3552527156068805e-20]
-    renderView1.CameraFocalPoint = [-2.549999918319142e-05, 1.959300980464672e-13, -1.3552527156068805e-20]
-    renderView1.CameraViewUp = [0.0, 0.0, 1.0]
-    renderView1.CameraParallelScale = 0.00016047195994169908
-    renderView1.ResetCamera()
+    renderView1.Update()
+
+    setCameraOrientation()
 
     for colorVar in colorVars:
         print("Animating", colorVar )
@@ -368,7 +359,7 @@ def animate(reader, **kwargs):
         HideScalarBarIfNotNeeded(wLUT, renderView1)
 
         ## NOTE: For color presets.
-        wLUT.ApplyPreset('Cool to Warm (Extended)', True)
+        wLUT.ApplyPreset('Rainbow Uniform', True)
 
         renderView1.Update()
         UpdateScalarBars()
@@ -696,6 +687,12 @@ def cross_section_snapshots(reader, **kwargs):
         Hide(projection, renderView1)
 
 
+def setCameraOrientation():
+    camera = GetActiveCamera()
+    camera.SetFocalPoint(-1,0,0)
+    camera.SetPosition(1,0,0)
+    camera.SetViewUp(0,-1,0)
+    ResetCamera()
 
 if __name__ == "__main__":
     main()
