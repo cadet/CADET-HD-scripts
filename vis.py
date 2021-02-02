@@ -114,16 +114,6 @@ def bead_loading(reader, **kwargs):
     dataArr = np.zeros((nts, nbeads, ncv))
     coordArr = np.zeros((nbeads,4))
 
-    for index in range(nbeads):
-        (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
-        # print("Threshold coordinate bounds:",xmin,xmax,ymin,ymax,zmin,zmax)
-        x = (xmax + xmin)/2
-        y = (ymax + ymin)/2
-        z = (zmax + zmin)/2
-        r = (xmax - xmin + ymax - ymin + zmax - zmin)/6
-        # print("xyzr:",x, y, z, r)
-        # coordArr[index,:] = np.array([x, y, z, r])
-        appendToBin([x,y,z,r],'bead_loading.xyzr', '=d')
 
     for timestep in range(nts):
         timeKeeper.Time = timestep
@@ -131,11 +121,22 @@ def bead_loading(reader, **kwargs):
 
         for index in range(nbeads):
 
-            print("Processing timestep:", timestep, "| bead:", index, end="\r")
+            print("Processing timestep: {timestep:3d} | bead: {index:5d}".format(timestep=timestep, index=index), end="\r")
             threshold = Threshold(Input=connectivity)
             threshold.ThresholdRange = [index, index]
             thresholdDisplay = Show(threshold, renderView1)
             # threshold.UpdatePipeline()
+
+            if timestep == 0:
+                (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+                # print("Threshold coordinate bounds:",xmin,xmax,ymin,ymax,zmin,zmax)
+                x = (xmax + xmin)/2
+                y = (ymax + ymin)/2
+                z = (zmax + zmin)/2
+                r = (xmax - xmin + ymax - ymin + zmax - zmin)/6
+                # print("xyzr:",x, y, z, r)
+                # coordArr[index,:] = np.array([x, y, z, r])
+                appendToBin([x,y,z,r],'bead_loading.xyzr', '=d')
 
             integrated = IntegrateVariables(Input=threshold)
             intdata = servermanager.Fetch(integrated)
