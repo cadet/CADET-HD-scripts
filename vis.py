@@ -544,9 +544,13 @@ def setCameraOrientation(zoom):
     camera.SetViewUp(0,-1,0)
     ResetCamera()
 
-    cx,cy,cz = camera.GetPosition()
-    camera.SetPosition(cx/zoom[0], cy/zoom[0], cz/zoom[0])
+    camera.Dolly(zoom)
     Render()
+
+
+    # cx,cy,cz = camera.GetPosition()
+    # camera.SetPosition(cx/zoom[0], cy/zoom[0], cz/zoom[0])
+    # Render()
 
 def Projection(inputView, projectionType):
     projection = None
@@ -575,7 +579,7 @@ def main():
 
     ap.add_argument("-c", "--colorVars", required=False, nargs='*', help="color map variable")
     ap.add_argument("-g", "--geometry", required=False, nargs=2, type=int, default=[1750, 1300], help="Animation geometry size")
-    ap.add_argument("-z", "--zoom", required=False, nargs=3, type=float, default=[1, 1, 1], help="Zoom factors for snapshot")
+    ap.add_argument("-z", "--zoom", required=False, type=float, default=1, help="Zoom (camera.dolly) value for view")
     ap.add_argument("-dr", "--display-representation", required=False, default='Surface', choices=['Surface With Edges', 'Surface'], help="Display representation")
     ap.add_argument("-nsb", "--no-scalar-bar", required=False, action='store_true', default=False, help="Disable scalar bar visibility")
     ap.add_argument("-nca", "--no-coordinate-axis", required=False, action='store_true', default=False, help="Disable coordinate axis visibility")
