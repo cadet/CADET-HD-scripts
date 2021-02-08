@@ -15,7 +15,7 @@ Usage by examples:
 Usage notes:
     > don't forget to use a processing flag like -s or -d or -w
     > -c flag takes a list as input, make sure to use it AFTER filepaths
-    > -f filetype is optional. Default is pvtu.
+    > -f filetype is optional. Default is pvtu. This way, running vis.py in a folder lets it detect & sort all files of the given filetype in the current folder unless files are specifically input.
     > The program ALWAYS starts animation outputs with suffix 0000, regardless of the timestep data you've supplied. So be wary of using it twice in the same dir.
     > Assumes that timestep suffix is "_%d" to autodetect files in current directory
 
@@ -31,6 +31,8 @@ Usage notes:
 ## DONE: rotated views [Good for image resolution in long columns]
 ## DONE: After updatescalarbars() they are always visible even with -nsb
 ## TODO: Allow modularity/composability of functions in operating modes
+## TODO: Automatic filetype detection
+## TODO: Easy way to select "Solid Color"
 
 import argparse
 from matplotlib import pyplot as plt
@@ -287,9 +289,12 @@ def snapshot(reader, args):
     zoom = args['zoom']
     files = args['FILES']
     filetype = args['filetype']
+    projectionType = args['projectionType']
+
+    projection = Projection(reader, projectionType)
 
     renderView1 = GetActiveViewOrCreate('RenderView')
-    display = Show(reader, renderView1)
+    display = Show(projection, renderView1)
     display.Representation = args['display_representation']
     renderView1.OrientationAxesVisibility = int(axisVisible)
 
@@ -575,7 +580,7 @@ def main():
     ap.add_argument("-b", "--bead-loading", required=False, action='store_true', help="Output bead loading data")
     ap.add_argument("-r", "--radial-integrate", required=False, help="Cylindrical shell integrate variables")
     ap.add_argument("-css", "--cross-section-snapshots", type=int, required=False, help="Run snapshotter for n cross section slices")
-    ap.add_argument("-p", "--projectionType", required=False, default='clip', help="projection type: clip | slice")
+    ap.add_argument("-p", "--projectionType", required=False, help="projection type: clip | slice")
 
     ap.add_argument("-c", "--colorVars", required=False, nargs='*', help="color map variable")
     ap.add_argument("-g", "--geometry", required=False, nargs=2, type=int, default=[1750, 1300], help="Animation geometry size")
