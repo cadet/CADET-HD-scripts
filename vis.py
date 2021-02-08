@@ -28,8 +28,7 @@ Usage notes:
 ## DONE: Parametrize view size geometry
 ## TODO: config.json file
 ## TODO: Parametrize background color
-## TODO: fix timestep data to be handled in from pvtu file? (in mixd2pvtu)
-## TODO: rotated views [Good for image resolution in long columns]
+## DONE: rotated views [Good for image resolution in long columns]
 ## DONE: After updatescalarbars() they are always visible even with -nsb
 ## TODO: Allow modularity/composability of functions in operating modes
 
@@ -78,9 +77,9 @@ def csvWriter(filename, x, y):
         writer.writerows(zip(x, y))
 
 ## TODO: Test written bin in mpi mode
-def bead_loading(reader, **kwargs):
-    colorVars = kwargs.get('colorVars', reader.PointArrayStatus) or reader.PointArrayStatus
-    files = kwargs.get('files')
+def bead_loading(reader, args):
+    colorVars = args['colorVars'] or reader.PointArrayStatus
+    files = args['FILES']
 
     try:
         timeKeeper = GetTimeKeeper()
@@ -121,7 +120,7 @@ def bead_loading(reader, **kwargs):
 
         for index in range(nbeads):
 
-            print("Processing timestep: {timestep:3d} | bead: {index:5d}".format(timestep=timestep, index=index), end="\r")
+            print("Processing timestep: {timestep:3d} | bead: {index:5d} | file: {file}".format(timestep=timestep, index=index, file=files[timestep]), end="\r")
             threshold = Threshold(Input=connectivity)
             threshold.ThresholdRange = [index, index]
             thresholdDisplay = Show(threshold, renderView1)
@@ -156,7 +155,8 @@ def bead_loading(reader, **kwargs):
             Delete(threshold)
 
         # TODO: this only works with one scalar currently, which is okay for now
-        appendToBin(dataArr[timestep,:,:], 'ts_' + str(timestep) + '.dat', "=d")
+        # appendToBin(dataArr[timestep,:,:], 'ts_' + str(timestep) + '.dat', "=d")
+        appendToBin(dataArr[timestep,:,:], files[timestep].replace('.pvtu', '.dat'), "=d")
 
 
 def calc_beads_loading(connectivity, colorVars, dataArr, nbeads):
@@ -183,15 +183,17 @@ def calc_beads_loading(connectivity, colorVars, dataArr, nbeads):
         Delete(threshold)
         del(threshold)
 
-def mass_flux(reader, **kwargs):
-    scalarBarVisible = kwargs.get('scalarBarVisible', True)
-    geometry = kwargs.get('geometry', [1750, 1300])
-    axisVisible = kwargs.get('axisVisible', True)
-    colorVars = kwargs.get('colorVars', reader.PointArrayStatus) or reader.PointArrayStatus
-    nSlice = kwargs.get('nSlice', 1) or 1
+def mass_flux(reader, args):
+
+    scalarBarVisible = not args['no_scalar_bar']
+    geometry = args['geometry']
+    axisVisible = not args['no_coordinate_axis']
+    colorVars = args['colorVars'] or reader.PointArrayStatus
+    nSlice = args['mass_flux'] or 1
 
     renderView1 = GetActiveViewOrCreate('RenderView')
     display = Show(reader, renderView1)
+    display.Representation = args['display_representation']
     # display.Representation = 'Surface With Edges'
 
     (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
@@ -278,51 +280,47 @@ def mass_flux(reader, **kwargs):
     plt.savefig('plot.pdf')
     # plt.show()
 
-def snapshot(reader, **kwargs):
-    scalarBarVisible = kwargs.get('scalarBarVisible', True)
-    axisVisible = kwargs.get('axisVisible', True)
-    geometry = kwargs.get('geometry')
-    zoom = kwargs.get('zoom')
+def snapshot(reader, args):
+    scalarBarVisible = not args['no_scalar_bar']
+    geometry = args['geometry']
+    axisVisible = not args['no_coordinate_axis']
+    zoom = args['zoom']
+    files = args['FILES']
+    filetype = args['filetype']
 
     renderView1 = GetActiveViewOrCreate('RenderView')
     display = Show(reader, renderView1)
-    display.Representation = 'Surface'
-    # display.Representation = 'Surface With Edges'
+    display.Representation = args['display_representation']
     renderView1.OrientationAxesVisibility = int(axisVisible)
-    # display.RescaleTransferFunctionToDataRange()
 
     renderView1.Update()
     renderView1.ResetCamera()
     renderView1.ViewSize = geometry
 
-    setCameraOrientation()
-
-    # renderView1.CameraPosition = [0.0005945160428284565, 1.959300980464672e-13, -1.3552527156068805e-20]
-    # renderView1.CameraFocalPoint = [-2.549999918319142e-05, 1.959300980464672e-13, -1.3552527156068805e-20]
-    # renderView1.CameraViewUp = [0.0, 0.0, 1.0]
-    # renderView1.CameraParallelScale = 0.00016047195994169908
-    # renderView1.ResetCamera()
-
-    cam = GetActiveCamera()
-    cx,cy,cz = cam.GetPosition()
-    cam.SetPosition(cx/zoom[0], cy/zoom[0], cz/zoom[0])
-    Render()
+    setCameraOrientation(zoom)
 
     timeKeeper1 = GetTimeKeeper()
-    for ts in reader.TimestepValues:
-        timeKeeper1.Time = ts
-        SaveScreenshot(str(ts)+'.png', renderView1, ImageResolution=[1750, 1300], TransparentBackground=1)
 
-def animate(reader, **kwargs):
-    projectionType = kwargs.get('projectionType', 'clip')
-    scalarBarVisible = kwargs.get('scalarBarVisible', True)
-    axisVisible = kwargs.get('axisVisible', True)
-    geometry = kwargs.get('geometry')
-    colorVars = kwargs.get('colorVars', reader.PointArrayStatus) or reader.PointArrayStatus
+    for ifile in files:
+        try:
+            timeKeeper1.Time = reader.TimestepValues[files.index(ifile)]
+        except:
+            timeKeeper1.Time = 0
+        SaveScreenshot(ifile.replace(filetype, 'png'), renderView1, ImageResolution=geometry, TransparentBackground=1)
+
+def animate(reader, args):
+    projectionType = args['projectionType']
+    colorVars = args['colorVars'] or reader.PointArrayStatus
+    scalarBarVisible = not args['no_scalar_bar']
+    geometry = args['geometry']
+    axisVisible = not args['no_coordinate_axis']
+    zoom = args['zoom']
 
     animationScene1 = GetAnimationScene()
     timeKeeper1 = GetTimeKeeper()
     animationScene1.UpdateAnimationUsingDataTimeSteps()
+
+    ## TODO: Animate using constant scalarbar range
 
     # try:
     #     ## Use last timestep as reference for creating color map
@@ -335,27 +333,17 @@ def animate(reader, **kwargs):
     #     animationScene1.EndTime = 0
     #     timeKeeper1.Time = 0
 
-    projection = None
-
-    if projectionType == 'clip':
-        projection = Clip(Input=reader)
-        Hide3DWidgets(proxy=projection.ClipType)
-    elif projectionType == 'slice':
-        projection = Slice(Input=reader)
-        Hide3DWidgets(proxy=projection.SliceType)
-    else:
-        print("Invalid Projection Type!")
-        sys.exit(-1)
+    projection = Projection(reader, projectionType)
 
     renderView1 = GetActiveViewOrCreate('RenderView')
     projectionDisplay = Show(projection, renderView1)
-    projectionDisplay.Representation = 'Surface'
+    projectionDisplay.Representation = args['display_representation']
     renderView1.OrientationAxesVisibility = int(axisVisible)
     projectionDisplay.RescaleTransferFunctionToDataRange()
     renderView1.ViewSize = geometry
     renderView1.Update()
 
-    setCameraOrientation()
+    setCameraOrientation(zoom)
 
     for colorVar in colorVars:
         print("Animating", colorVar )
@@ -367,7 +355,6 @@ def animate(reader, **kwargs):
         wPWF = GetOpacityTransferFunction(colorVar)
         HideScalarBarIfNotNeeded(wLUT, renderView1)
 
-        ## NOTE: For color presets.
         wLUT.ApplyPreset('Rainbow Uniform', True)
 
         renderView1.Update()
@@ -377,17 +364,15 @@ def animate(reader, **kwargs):
         SaveAnimation(colorVar + '.png', renderView1, ImageResolution=geometry, TransparentBackground=1, SuffixFormat='.%04d')
 
 
-def radial_shell_integrate(reader, **kwargs):
+def radial_shell_integrate(reader, args):
 
-    # projectionType = kwargs.get('projectionType', 'clip')
-    scalarBarVisible = kwargs.get('scalarBarVisible', True)
-    axisVisible = kwargs.get('axisVisible', True)
-    geometry = kwargs.get('geometry')
-    colorVars = kwargs.get('colorVars', reader.PointArrayStatus) or reader.PointArrayStatus
-    zoom = kwargs.get('zoom')
-    nRegions = kwargs.get('nRegions')
+    scalarBarVisible = not args['no_scalar_bar']
+    geometry = args['geometry']
+    axisVisible = not args['no_coordinate_axis']
+    zoom = args['zoom']
+    colorVars = args['colorVars'] or reader.PointArrayStatus
+    nRegions = int(args['radial_integrate'])
 
-    # rShells = [0, 1e-5, 2e-5, 3e-5, 4e-5, 5e-5]
 
     ## Calc bounding box. Requires show
     renderView1 = GetActiveViewOrCreate('RenderView')
@@ -473,24 +458,127 @@ def radial_shell_integrate(reader, **kwargs):
 #     threshold1.Scalars = ['POINTS', 'Normals_Z']
 
 
+
+def cross_section_snapshots(reader, args):
+    scalarBarVisible = not args['no_scalar_bar']
+    geometry = args['geometry']
+    axisVisible = not args['no_coordinate_axis']
+    zoom = args['zoom']
+    colorVars = args['colorVars'] or reader.PointArrayStatus
+    nSlice = args['cross_section_snapshots'] or 1
+    files = args['FILES']
+
+    renderView1 = GetActiveViewOrCreate('RenderView')
+    display = Show(reader, renderView1)
+    display.Representation = args['display_representation']
+    # display.Representation = 'Surface With Edges'
+
+    (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+    print(xmin,xmax,ymin,ymax,zmin,zmax)
+
+    Hide(reader, renderView1)
+
+    ## NOTE: Only takes takes one color
+    colorVar = colorVars[0]
+    flowrate = []
+    zs = []
+
+    count = 0
+
+    try:
+        ## Set timestep to last timestep (last file in series)
+        timeKeeper = GetTimeKeeper()
+        timeKeeper.Time = reader.TimestepValues[-1]
+    except:
+        pass
+
+    for zpos in np.linspace(zmin, zmax, nSlice):
+
+        count = count + 1
+        print("Loop: ", count, zpos)
+        projection = Slice(Input=reader)
+        Hide3DWidgets(proxy=projection.SliceType)
+
+        projection.SliceType = 'Plane'
+        projection.HyperTreeGridSlicer = 'Plane'
+        projection.SliceOffsetValues = [0.0]
+
+        projection.SliceType.Origin = [0.0, 0.0, zpos]
+        projection.SliceType.Normal = [0.0, 0.0, -1.0]
+        projection.UpdatePipeline()
+
+        projectionDisplay = Show(projection, renderView1)
+        projectionDisplay.Representation = args['display_representation']
+        # projectionDisplay.Representation = 'Surface With Edges'
+        renderView1.OrientationAxesVisibility = int(axisVisible)
+        projectionDisplay.RescaleTransferFunctionToDataRange()
+
+        renderView1.Update()
+        renderView1.ViewSize = geometry
+        renderView1.ResetCamera()
+
+        ColorBy(projectionDisplay, ('POINTS', colorVar))
+        projectionDisplay.RescaleTransferFunctionToDataRange()
+
+        wLUT = GetColorTransferFunction(colorVar)
+        wPWF = GetOpacityTransferFunction(colorVar)
+        HideScalarBarIfNotNeeded(wLUT, renderView1)
+
+        ## NOTE: For color presets.
+        wLUT.ApplyPreset('Rainbow Uniform', True)
+
+        renderView1.Update()
+        UpdateScalarBars()
+
+        projectionDisplay.SetScalarBarVisibility(renderView1, scalarBarVisible)
+
+        SaveScreenshot(colorVar + '_' + str(count)+'.png', renderView1, ImageResolution=geometry, TransparentBackground=1)
+
+        Hide(projection, renderView1)
+
+
+def setCameraOrientation(zoom):
+    camera = GetActiveCamera()
+    camera.SetFocalPoint(-1,0,0)
+    camera.SetPosition(1,0,0)
+    camera.SetViewUp(0,-1,0)
+    ResetCamera()
+
+    cx,cy,cz = camera.GetPosition()
+    camera.SetPosition(cx/zoom[0], cy/zoom[0], cz/zoom[0])
+    Render()
+
+def Projection(inputView, projectionType):
+    projection = None
+    if projectionType == 'clip':
+        projection = Clip(Input=inputView)
+        Hide3DWidgets(proxy=projection.ClipType)
+    elif projectionType == 'slice':
+        projection = Slice(Input=inputView)
+        Hide3DWidgets(proxy=projection.SliceType)
+    else:
+        projection = inputView
+    return projection
+
 def main():
 
     ap = argparse.ArgumentParser()
 
-    ap.add_argument("-p", "--projectionType", required=False, default='clip', help="projection type: clip | slice")
+    ap.add_argument("-s", "--snapshot", required=False, action='store_true', help="run snapshotter")
     ap.add_argument("-a", "--animate", required=False, action='store_true', help="run animator")
     ap.add_argument("-d", "--distribute", required=False, help="Apply d3 filter and save data")
     ap.add_argument("-m", "--mass-flux", required=False, help="Find mass flux at n different slices along the z direction")
-    ap.add_argument("-s", "--snapshot", required=False, action='store_true', help="run snapshotter")
     ap.add_argument("-b", "--bead-loading", required=False, action='store_true', help="Output bead loading data")
     ap.add_argument("-r", "--radial-integrate", required=False, help="Cylindrical shell integrate variables")
+    ap.add_argument("-css", "--cross-section-snapshots", type=int, required=False, help="Run snapshotter for n cross section slices")
+    ap.add_argument("-p", "--projectionType", required=False, default='clip', help="projection type: clip | slice")
 
     ap.add_argument("-c", "--colorVars", required=False, nargs='*', help="color map variable")
     ap.add_argument("-g", "--geometry", required=False, nargs=2, type=int, default=[1750, 1300], help="Animation geometry size")
     ap.add_argument("-z", "--zoom", required=False, nargs=3, type=float, default=[1, 1, 1], help="Zoom factors for snapshot")
+    ap.add_argument("-dr", "--display-representation", required=False, default='Surface', choices=['Surface With Edges', 'Surface'], help="Display representation")
     ap.add_argument("-nsb", "--no-scalar-bar", required=False, action='store_true', default=False, help="Disable scalar bar visibility")
     ap.add_argument("-nca", "--no-coordinate-axis", required=False, action='store_true', default=False, help="Disable coordinate axis visibility")
-    ap.add_argument("-css", "--cross-section-snapshots", type=int, required=False, help="Run snapshotter for n cross section slices")
 
     ap.add_argument("-f", "--filetype", required=False, default='pvtu', choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="filetype: xdmf | vtu | vtk | pvtu")
     ap.add_argument("-w", "--writer", required=False, choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="writer: xdmf | vtu | vtk | pvtu")
@@ -498,10 +586,6 @@ def main():
     ap.add_argument("FILES", nargs='*', help="files..")
 
     args = vars(ap.parse_args())
-
-    # print(args['geometry'])
-    # for x in args['geometry']:
-    #     print(type(x))
 
     if len(args['FILES']) == 0:
         filetype = args['filetype']
@@ -545,57 +629,22 @@ def main():
         sys.exit(0)
 
     if args['animate']:
-        animate(reader,
-                projectionType = args['projectionType'],
-                colorVars = args['colorVars'],
-                scalarBarVisible = not args['no_scalar_bar'],
-                geometry = args['geometry'],
-                axisVisible = not args['no_coordinate_axis']
-                )
+        animate(reader, args)
 
     if args['snapshot']:
-        snapshot(reader,
-                scalarBarVisible = not args['no_scalar_bar'],
-                geometry = args['geometry'],
-                axisVisible = not args['no_coordinate_axis'],
-                zoom = args['zoom']
-                )
+        snapshot(reader, args)
 
     if args['mass_flux']:
-        mass_flux(reader,
-                scalarBarVisible = not args['no_scalar_bar'],
-                geometry = args['geometry'],
-                axisVisible = not args['no_coordinate_axis'],
-                colorVars = args['colorVars'],
-                nSlice = args['mass_flux']
-                )
+        mass_flux(reader, args)
 
     if args['bead_loading']:
-        bead_loading(reader,
-                colorVars = args['colorVars'],
-                files = args['FILES']
-                )
+        bead_loading(reader, args)
 
     if args['radial_integrate']:
-        radial_shell_integrate( reader,
-                scalarBarVisible = not args['no_scalar_bar'],
-                geometry = args['geometry'],
-                axisVisible = not args['no_coordinate_axis'],
-                zoom = args['zoom'],
-                colorVars = args['colorVars'],
-                nRegions = int(args['radial_integrate'])
-                )
+        radial_shell_integrate( reader, args)
 
     if args['cross_section_snapshots']:
-        cross_section_snapshots(reader,
-                scalarBarVisible = not args['no_scalar_bar'],
-                geometry = args['geometry'],
-                axisVisible = not args['no_coordinate_axis'],
-                zoom = args['zoom'],
-                colorVars = args['colorVars'],
-                nSlice = args['cross_section_snapshots'],
-                files = args['FILES']
-                )
+        cross_section_snapshots(reader, args)
 
 
     if args['writer']:
@@ -619,89 +668,6 @@ def main():
         writer.FileName = 'script-output'
         writer.UpdatePipeline()
 
-def cross_section_snapshots(reader, **kwargs):
-    scalarBarVisible = kwargs.get('scalarBarVisible', True)
-    geometry = kwargs.get('geometry', [1750, 1300])
-    axisVisible = kwargs.get('axisVisible', True)
-    colorVars = kwargs.get('colorVars', reader.PointArrayStatus) or reader.PointArrayStatus
-    nSlice = kwargs.get('nSlice', 1) or 1
-    files = kwargs.get('files')
-
-
-    renderView1 = GetActiveViewOrCreate('RenderView')
-    display = Show(reader, renderView1)
-    # display.Representation = 'Surface With Edges'
-
-    (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
-    print(xmin,xmax,ymin,ymax,zmin,zmax)
-
-    Hide(reader, renderView1)
-
-    ## NOTE: Only takes takes one color
-    colorVar = colorVars[0]
-    flowrate = []
-    zs = []
-
-    count = 0
-
-    try:
-        ## Set timestep to last timestep (last file in series)
-        timeKeeper = GetTimeKeeper()
-        timeKeeper.Time = reader.TimestepValues[-1]
-    except:
-        pass
-
-    for zpos in np.linspace(zmin, zmax, nSlice):
-
-        count = count + 1
-        print("Loop: ", count, zpos)
-        projection = Slice(Input=reader)
-        Hide3DWidgets(proxy=projection.SliceType)
-
-        projection.SliceType = 'Plane'
-        projection.HyperTreeGridSlicer = 'Plane'
-        projection.SliceOffsetValues = [0.0]
-
-        projection.SliceType.Origin = [0.0, 0.0, zpos]
-        projection.SliceType.Normal = [0.0, 0.0, -1.0]
-        projection.UpdatePipeline()
-
-        projectionDisplay = Show(projection, renderView1)
-        projectionDisplay.Representation = 'Surface'
-        # projectionDisplay.Representation = 'Surface With Edges'
-        renderView1.OrientationAxesVisibility = int(axisVisible)
-        projectionDisplay.RescaleTransferFunctionToDataRange()
-
-        renderView1.Update()
-        renderView1.ViewSize = geometry
-        renderView1.ResetCamera()
-
-        ColorBy(projectionDisplay, ('POINTS', colorVar))
-        projectionDisplay.RescaleTransferFunctionToDataRange()
-
-        wLUT = GetColorTransferFunction(colorVar)
-        wPWF = GetOpacityTransferFunction(colorVar)
-        HideScalarBarIfNotNeeded(wLUT, renderView1)
-
-        ## NOTE: For color presets.
-        wLUT.ApplyPreset('Rainbow Uniform', True)
-
-        renderView1.Update()
-        UpdateScalarBars()
-
-        projectionDisplay.SetScalarBarVisibility(renderView1, scalarBarVisible)
-
-        SaveScreenshot(colorVar + '_' + str(count)+'.png', renderView1, ImageResolution=[1750, 1300], TransparentBackground=1)
-
-        Hide(projection, renderView1)
-
-
-def setCameraOrientation():
-    camera = GetActiveCamera()
-    camera.SetFocalPoint(-1,0,0)
-    camera.SetPosition(1,0,0)
-    camera.SetViewUp(0,-1,0)
-    ResetCamera()
 
 if __name__ == "__main__":
     main()
