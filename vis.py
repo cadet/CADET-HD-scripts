@@ -283,6 +283,7 @@ def mass_flux(reader, args):
     # plt.show()
 
 def snapshot(reader, args):
+    colorVars = args['colorVars'] or reader.PointArrayStatus
     scalarBarVisible = not args['no_scalar_bar']
     geometry = args['geometry']
     axisVisible = not args['no_coordinate_axis']
@@ -306,12 +307,35 @@ def snapshot(reader, args):
 
     timeKeeper1 = GetTimeKeeper()
 
+    ## TODO: Add colors
+
     for ifile in files:
         try:
             timeKeeper1.Time = reader.TimestepValues[files.index(ifile)]
         except:
             timeKeeper1.Time = 0
-        SaveScreenshot(ifile.replace(filetype, 'png'), renderView1, ImageResolution=geometry, TransparentBackground=1)
+
+        for colorVar in colorVars:
+            print("Snapping", colorVar )
+
+            if colorVar == 'None':
+                ColorBy(display, None)
+            else:
+                ColorBy(display, ('POINTS', colorVar))
+
+            display.RescaleTransferFunctionToDataRange()
+
+            wLUT = GetColorTransferFunction(colorVar)
+            wPWF = GetOpacityTransferFunction(colorVar)
+            HideScalarBarIfNotNeeded(wLUT, renderView1)
+
+            wLUT.ApplyPreset('Rainbow Uniform', True)
+
+            renderView1.Update()
+            UpdateScalarBars()
+
+            display.SetScalarBarVisibility(renderView1, scalarBarVisible)
+            SaveScreenshot(colorVar + '_' + ifile.replace(filetype, 'png'), renderView1, ImageResolution=geometry, TransparentBackground=1)
 
 def animate(reader, args):
     projectionType = args['projectionType']
@@ -326,6 +350,7 @@ def animate(reader, args):
     animationScene1.UpdateAnimationUsingDataTimeSteps()
 
     ## TODO: Animate using constant scalarbar range
+    ## TODO: Fix animation for one timestep
 
     # try:
     #     ## Use last timestep as reference for creating color map
@@ -353,7 +378,11 @@ def animate(reader, args):
     for colorVar in colorVars:
         print("Animating", colorVar )
 
-        ColorBy(projectionDisplay, ('POINTS', colorVar))
+        if colorVar == 'None':
+            ColorBy(display, None)
+        else:
+            ColorBy(display, ('POINTS', colorVar))
+
         projectionDisplay.RescaleTransferFunctionToDataRange()
 
         wLUT = GetColorTransferFunction(colorVar)
