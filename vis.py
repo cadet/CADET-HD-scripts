@@ -321,10 +321,12 @@ def geometry_snapshot(reader, args):
 
     threshold = Threshold(Input=connectivity)
     threshold.ThresholdRange = [nbeads, nbeads]
-    thresholdDisplay = Show(threshold, renderView1)
-    ColorBy(thresholdDisplay, None)
-    # threshold.UpdatePipeline()
-    thresholdDisplay.Opacity = 0.3
+    outerShell = Projection(threshold, 'clip')
+    outerShellDisplay = Show(outerShell, renderView1)
+    ColorBy(outerShellDisplay, None)
+    # outerShell.UpdatePipeline()
+    outerShellDisplay.Opacity = 0.3
+    renderView1.InteractionMode = '2D'
 
     ## NOTE: Only works on the first file provided
     SaveScreenshot(files[0].replace(filetype, 'png'), renderView1, ImageResolution=geometry, TransparentBackground=1)
