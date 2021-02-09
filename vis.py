@@ -282,6 +282,56 @@ def mass_flux(reader, args):
     plt.savefig('plot.pdf')
     # plt.show()
 
+def geometry_snapshot(reader, args):
+
+    geometry    = args['geometry']
+    axisVisible = not args['no_coordinate_axis']
+    zoom        = args['zoom']
+    files       = args['FILES']
+    filetype    = args['filetype']
+
+    renderView1 = GetActiveViewOrCreate('RenderView')
+    connectivity = Connectivity(Input=reader)
+    connectivityDisplay = Show(connectivity, renderView1)
+
+    connectivityDisplay.Representation = args['display_representation']
+    renderView1.OrientationAxesVisibility = int(axisVisible)
+
+    renderView1.Update()
+    renderView1.ResetCamera()
+    renderView1.ViewSize = geometry
+    setCameraOrientation(zoom)
+
+    Hide(connectivity, renderView1)
+
+    # NOTE: Threshold  range will be (0, n) where n is number of beads.
+    # Typically, the interstitial domain is the last, n+1th region.
+    # Here, we ignore the interstitial region by setting nbeads = n, and not n+1.
+    nbeads = int(connectivity.PointData.GetArray("RegionId").GetRange()[1])
+    print("Number of Objects:", nbeads)
+
+    for index in range(nbeads):
+        threshold = Threshold(Input=connectivity)
+        threshold.ThresholdRange = [index, index]
+        thresholdDisplay = Show(threshold, renderView1)
+        ColorBy(thresholdDisplay, None)
+        # threshold.UpdatePipeline()
+        thresholdDisplay.AmbientColor = [2/255, 61/255, 107/255]
+        thresholdDisplay.DiffuseColor = [2/255, 61/255, 107/255]
+
+    threshold = Threshold(Input=connectivity)
+    threshold.ThresholdRange = [nbeads, nbeads]
+    thresholdDisplay = Show(threshold, renderView1)
+    ColorBy(thresholdDisplay, None)
+    # threshold.UpdatePipeline()
+    thresholdDisplay.Opacity = 0.3
+
+    ## NOTE: Only works on the first file provided
+    SaveScreenshot(files[0].replace(filetype, 'png'), renderView1, ImageResolution=geometry, TransparentBackground=1)
+
+
+    pass
+
 def snapshot(reader, args):
     colorVars = args['colorVars'] or reader.PointArrayStatus
     scalarBarVisible = not args['no_scalar_bar']
@@ -306,8 +356,6 @@ def snapshot(reader, args):
     setCameraOrientation(zoom)
 
     timeKeeper1 = GetTimeKeeper()
-
-    ## TODO: Add colors
 
     for ifile in files:
         try:
@@ -383,6 +431,7 @@ def animate(reader, args):
         else:
             ColorBy(display, ('POINTS', colorVar))
 
+        ## NOTE: Removing this should HELP fix the varying scalar bar range for every frame
         projectionDisplay.RescaleTransferFunctionToDataRange()
 
         wLUT = GetColorTransferFunction(colorVar)
@@ -406,7 +455,6 @@ def radial_shell_integrate(reader, args):
     zoom = args['zoom']
     colorVars = args['colorVars'] or reader.PointArrayStatus
     nRegions = int(args['radial_integrate'])
-
 
     ## Calc bounding box. Requires show
     renderView1 = GetActiveViewOrCreate('RenderView')
@@ -609,6 +657,7 @@ def main():
     ap.add_argument("-b", "--bead-loading", required=False, action='store_true', help="Output bead loading data")
     ap.add_argument("-r", "--radial-integrate", required=False, help="Cylindrical shell integrate variables")
     ap.add_argument("-css", "--cross-section-snapshots", type=int, required=False, help="Run snapshotter for n cross section slices")
+    ap.add_argument("-gs", "--geometry-snapshot", required=False, action='store_true', help="Run snapshotter for n cross section slices")
     ap.add_argument("-p", "--projectionType", required=False, help="projection type: clip | slice")
 
     ap.add_argument("-c", "--colorVars", required=False, nargs='*', help="color map variable")
@@ -684,6 +733,8 @@ def main():
     if args['cross_section_snapshots']:
         cross_section_snapshots(reader, args)
 
+    if args['geometry_snapshot']:
+        geometry_snapshot(reader, args)
 
     if args['writer']:
         writer=None
