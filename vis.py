@@ -311,6 +311,7 @@ def geometry_snapshot(reader, args):
     print("Number of Objects:", nbeads)
 
     for index in range(nbeads):
+        print("Processing bead: {index}".format(index=index))
         threshold = Threshold(Input=connectivity)
         threshold.ThresholdRange = [index, index]
         thresholdDisplay = Show(threshold, renderView1)
@@ -325,7 +326,7 @@ def geometry_snapshot(reader, args):
     outerShellDisplay = Show(outerShell, renderView1)
     ColorBy(outerShellDisplay, None)
     # outerShell.UpdatePipeline()
-    outerShellDisplay.Opacity = 0.3
+    outerShellDisplay.Opacity = 0.5
     renderView1.InteractionMode = '2D'
 
     ## NOTE: Only works on the first file provided
