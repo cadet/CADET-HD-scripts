@@ -12,6 +12,7 @@
         Ensure that xns.in exists in required ROOT/FLOW/<fsim> & ROOT/MASS/<msim> folders
 
 """
+
 # TODO: handle numbers in dicts properly
 # TODO: Allow use of mixdinfo: for use with older sims for checking
 # TODO: consistent meshvolume factors/magnitude
@@ -175,12 +176,12 @@ def main():
         kd   = float(xns_mass_data['mclkd'][0])
         cin  = float(xns_mass_data['rngdexp'][2])
     except:
-        pass
+        print("ERROR: Couldn't read xns mass input file!")
 
     try:
         qinf = qmax * ka / (ka*cin + kd)
     except:
-        pass
+        print("ERROR: Couldn't calculate qinf!")
 
 
     # print(json.dumps(xns_flow_data, indent=4))
