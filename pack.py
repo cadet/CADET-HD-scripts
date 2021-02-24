@@ -309,7 +309,7 @@ def main():
 
     fullBed = PackedBed()
 
-    dataformat = "<f"
+    dataformat = "<f" ## For old packings with little endian floating point data. Use <d for new ones
     arr = bin_to_arr(packing, dataformat)
     for chunk in grouper(arr,4):
         if (chunk[2] >= zBot/scaling_factor) and (chunk[2] <= zTop/scaling_factor):
@@ -324,8 +324,9 @@ def main():
     h = (zTop - zBot)*meshScalingFactor  + inlet + outlet
     hBed = fullBed.h
 
-    print("R:", R)
-    print("h:", h)
+    print("Cylinder Radius (with rCylDelta):", R)
+    print("Cylinder Height (full):", h)
+    print("Bed Height (zmax - zmin):", hBed)
 
     # print("Cylinder Volume:", fullBed.CylinderVolume)
     # print("Packed Bed Volume:", fullBed.volume())

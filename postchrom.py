@@ -78,8 +78,8 @@ def trapz(y, *args, **kwargs):
          sum = sum + 0.5 * (y[i] + y[i+1]) * (x[i+1] - x[i])
      return sum
 
-def num_holdup_vol(t, c, R, u):
-    cn = [ (1 - elem / c[-1]) for elem in c]
+def num_holdup_vol(t, c, R, u, cin):
+    cn = [ (1 - elem / cin) for elem in c]
     holdup_num = trapz(cn, x=t) * math.pi * R**2 * u
     return holdup_num
 

@@ -297,10 +297,6 @@ def geometry_snapshot(reader, args):
     connectivityDisplay.Representation = args['display_representation']
     renderView1.OrientationAxesVisibility = int(axisVisible)
 
-    renderView1.Update()
-    renderView1.ResetCamera()
-    renderView1.ViewSize = geometry
-    setCameraOrientation(zoom)
 
     Hide(connectivity, renderView1)
 
@@ -328,6 +324,11 @@ def geometry_snapshot(reader, args):
     # outerShell.UpdatePipeline()
     outerShellDisplay.Opacity = 0.5
     renderView1.InteractionMode = '2D'
+
+    renderView1.Update()
+    renderView1.ResetCamera()
+    renderView1.ViewSize = geometry
+    setCameraOrientation(zoom) ## NOTE: Zoom doesn't work with InteractionMode = '2D'
 
     ## NOTE: Only works on the first file provided
     SaveScreenshot(files[0].replace(filetype, 'png'), renderView1, ImageResolution=geometry, TransparentBackground=1)
@@ -631,7 +632,6 @@ def setCameraOrientation(zoom):
 
     camera.Dolly(zoom)
     Render()
-
 
     # cx,cy,cz = camera.GetPosition()
     # camera.SetPosition(cx/zoom[0], cy/zoom[0], cz/zoom[0])

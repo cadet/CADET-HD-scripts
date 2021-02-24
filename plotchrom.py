@@ -8,11 +8,18 @@ import matplotlib.pyplot as plt
 import sys
 import argparse
 
-def normalize(data):
-    return [ x/data[-1] for x in data ]
+def normalize(data, refValue):
+    return [ x/refValue for x in data ]
 
 def rescale(data, factor):
     return [x*factor for x in data]
+
+def rescaleVariant(x, y, factor):
+    import numpy as np
+    factors = np.linspace(1,factor,len(x))
+    # factors = [ 1 + (factor-1) * j/max(y) for j in y]
+    return [ i*j for i,j in zip(x,factors) ]
+    # return [ i*factor*(j/max(y)) for i,j in zip(x,y) ]
 
 # def readChromatogram(data_path, delimiter):
 def readChromatogram(data_path):
@@ -31,6 +38,19 @@ def readChromatogram(data_path):
                 time.append(float(data_line[0]))
                 conc.append(float(data_line[1]))
     return time, conc
+
+def trapz(y, *args, **kwargs):
+     x = kwargs.get('x', range(len(y)))
+     sum = 0.0
+     for i in range(len(x) - 1):
+         sum = sum + 0.5 * (y[i] + y[i+1]) * (x[i+1] - x[i])
+     return sum
+
+def num_holdup_vol(t, c, R, u):
+    import math
+    cn = [ (1 - elem / c[-1]) for elem in c]
+    holdup_num = trapz(cn, x=t) * math.pi * R**2 * u
+    return holdup_num
 
 ap = argparse.ArgumentParser()
 ap.add_argument("files", nargs='*', help="files to plot")
@@ -52,8 +72,8 @@ ap.add_argument("-yl", "--ylims", required=False,nargs=2, type=float,
         help="y axis limits")
 ap.add_argument("-f", "--fill", required=False, action='store_true',
         help="fill area under curve")
-ap.add_argument("-n", "--normalize", required=False, action='store_true',
-        help="normalize y data to the last value")
+ap.add_argument("-n", "--normalize", required=False,
+        help="normalize y data to the reference value")
 ap.add_argument("-nl", "--no-legend", required=False, action='store_true',
         help="don't show legend")
 ap.add_argument("--legend", required=False, nargs=3, default=['upper center', '0.5', '-0.2'], type=str,
@@ -62,7 +82,11 @@ ap.add_argument("-o", "--output", required=False,
         help="output file")
 ap.add_argument("-r", "--rescale", type=float, required=False,
         help="Rescale graph with multiplicative factor (1/holdup-ratio)")
-ap.add_argument("-sr", "--save-rescaled", required=False, action='store_true',
+ap.add_argument("-rv", "--rescale-variant", type=float, required=False,
+        help="Rescale graph based on y value with multiplicative factor (1/holdup-ratio)")
+ap.add_argument("-sr", "--save-rescaled", required=False,
+        help="File to save rescaled data")
+ap.add_argument("-hv", "--holdup-volume", required=False, nargs = 2, type=float,
         help="File to save rescaled data")
 # ap.add_argument("--csv", required=False, action='store_true',
 #         help="input is csv file instead of default space separated")
@@ -100,9 +124,11 @@ with plt.style.context(['science']):
         # x, y = readChromatogram(filename, delimiter)
         x, y = readChromatogram(filename)
         if args['normalize']:
-            y = normalize(y)
+            y = normalize(y, args['normalize'])
         if args['rescale']:
             x = rescale(x, args['rescale'])
+        if args['rescale_variant']:
+            x = rescaleVariant(x, y, args['rescale_variant'])
         line = ax.plot(x, y, label=label, marker=marker, linestyle=linestyle)
         if args['fill']:
             ax.fill_between(x, y, 1, interpolate=True)
@@ -129,9 +155,17 @@ with plt.style.context(['science']):
     if args['save_rescaled']:
         import csv
         for filename,x,y in zip(args['files'], xs, ys):
-            with open(filename+'-postscaled', 'w') as f:
-                writer = csv.writer(f, delimiter=delimiter)
+            with open(filename+'-' + args['save_rescaled'], 'w') as f:
+                writer = csv.writer(f, delimiter=',')
                 writer.writerows(zip(x, y))
+
+    if args['normalize']:
+        import csv
+        for filename,x,y in zip(args['files'], xs, ys):
+            with open(filename+'-normalized', 'w') as f:
+                writer = csv.writer(f, delimiter=',')
+                writer.writerows(zip(x, y))
+
 
     if args['to_csv']:
         import csv
@@ -139,3 +173,10 @@ with plt.style.context(['science']):
             with open(filename+'.csv', 'w') as f:
                 writer = csv.writer(f, delimiter=',')
                 writer.writerows(zip(x, y))
+
+    if args['holdup_volume']:
+        for filename,x,y in zip(args['files'], xs, ys):
+            holdup = num_holdup_vol(x, y, args['holdup_volume'][0], args['holdup_volume'][1])
+            print("{filename}: {holdup}".format(filename=filename, holdup=holdup))
+
+
