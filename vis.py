@@ -232,37 +232,6 @@ def mass_flux(reader, args):
         projection.SliceType.Normal = [0.0, 0.0, -1.0]
         projection.UpdatePipeline()
 
-        ## {{{
-        # projectionDisplay = Show(projection, renderView1)
-        # projectionDisplay.Representation = 'Surface'
-        # # projectionDisplay.Representation = 'Surface With Edges'
-        # renderView1.OrientationAxesVisibility = int(axisVisible)
-        # projectionDisplay.RescaleTransferFunctionToDataRange()
-
-        # renderView1.Update()
-        # renderView1.ViewSize = geometry
-        # renderView1.ResetCamera()
-
-        # ColorBy(projectionDisplay, ('POINTS', colorVar))
-        # projectionDisplay.RescaleTransferFunctionToDataRange()
-
-        # wLUT = GetColorTransferFunction(colorVar)
-        # wPWF = GetOpacityTransferFunction(colorVar)
-        # HideScalarBarIfNotNeeded(wLUT, renderView1)
-
-        # ## NOTE: For color presets.
-        # wLUT.ApplyPreset('Cool to Warm (Extended)', True)
-
-        # renderView1.Update()
-        # UpdateScalarBars()
-
-        # projectionDisplay.SetScalarBarVisibility(renderView1, scalarBarVisible)
-
-        # SaveScreenshot(colorVar + str(count)+'.png', renderView1, ImageResolution=[1750, 1300], TransparentBackground=0)
-
-        # Hide(projection, renderView1)
-        ## }}}
-
         integrated = IntegrateVariables(Input=projection)
         intdata = servermanager.Fetch(integrated)
         intdata = dsa.WrapDataObject(intdata)
@@ -542,7 +511,6 @@ def radial_shell_integrate(reader, args):
 #     threshold1 = Threshold(Input=generateSurfaceNormals1)
 #     threshold1.ThresholdRange = [1.0, 1.0]
 #     threshold1.Scalars = ['POINTS', 'Normals_Z']
-
 
 
 def cross_section_snapshots(reader, args):

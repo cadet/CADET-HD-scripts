@@ -8,6 +8,8 @@
         zBot: bottom limit of slice to look for beads by center point.
         zTop: top limit of slice ...
         scaling factor: two packing.xyzd might not have the same dimensions. This helps fix that.
+
+@NOTE: Doesn't work with porosity-controlled genmesh output meshes yet!!.
 """
 
 # DONE: implement use of histo
@@ -95,6 +97,7 @@ class PackedBed:
         ymr = []
         zpr = []
         zmr = []
+        z = []
 
         for bead in self.beads:
             xpr.append(bead.x + bead.r)
@@ -103,6 +106,7 @@ class PackedBed:
             ymr.append(bead.y - bead.r)
             zpr.append(bead.z + bead.r)
             zmr.append(bead.z - bead.r)
+            z.append(bead.z)
 
         radList = [ bead.r for bead in self.beads ]
         self.rmax = max(radList)
@@ -114,8 +118,9 @@ class PackedBed:
         self.ymin = min(ymr)
         self.xmin = min(xmr)
         self.zmax = max(zpr)
-        self.zmin = min(zpr)
-        self.R = max(self.xmax, -self.xmin, self.ymax, -self.ymin)
+        self.zmin = min(zmr)
+
+        self.R = max((self.xmax-self.xmin)/2, (self.ymax-self.ymin)/2) ## Similar to Genmesh
         self.h = self.zmax - self.zmin
         self.CylinderVolume = pi * self.R**2 * self.h
 
@@ -269,7 +274,10 @@ def main():
     ap.add_argument("-msf", "--mesh-scaling-factor", type=float, default=1e-4, help="Post meshing scaling factor")
     ap.add_argument("-rf", "--r-factor", type=float, default=1, help="Bead radius shrinking factor")
 
-    # ap.add_argument("FILES", nargs='*', help="files..")
+    ap.add_argument("-v", "--vartype", help="type of variable stored (d | i) in packing file", default='d')
+    ap.add_argument("-e", "--endianness", help="> or <", default='<')
+
+    ap.add_argument("-d", "--dry-run", help="Do not calculate vol_frac, porosities and mean_radii", action='store_true')
 
     args = vars(ap.parse_args())
 
@@ -286,8 +294,17 @@ def main():
         scaling_factor = float(infiledict['preScalingFactor'])
         rFactor = float(infiledict['rFactor'])
         meshScalingFactor = float(infiledict['Mesh.ScalingFactor'])
+
+        endianness = '<'
+        packingPrecision = int(infiledict['packingPrecision'])
+        if packingPrecision == 8:
+            vartype = 'd'
+        else:
+            vartype = 'f'
     else:
         packing = args['packing']
+        vartype = args['vartype']
+        endianness = args['endianness']
         zBot = args['zlimits'][0]
         zTop = args['zlimits'][1]
         scaling_factor = args['pre_scaling_factor']
@@ -309,7 +326,8 @@ def main():
 
     fullBed = PackedBed()
 
-    dataformat = "<f" ## For old packings with little endian floating point data. Use <d for new ones
+    # dataformat = "<f" ## For old packings with little endian floating point data. Use <d for new ones
+    dataformat = endianness + vartype
     arr = bin_to_arr(packing, dataformat)
     for chunk in grouper(arr,4):
         if (chunk[2] >= zBot/scaling_factor) and (chunk[2] <= zTop/scaling_factor):
@@ -324,6 +342,10 @@ def main():
     h = (zTop - zBot)*meshScalingFactor  + inlet + outlet
     hBed = fullBed.h
 
+    print("xmax = {}, xmin = {}".format(fullBed.xmax, fullBed.xmin))
+    print("ymax = {}, ymin = {}".format(fullBed.ymax, fullBed.ymin))
+    print("zmax = {}, zmin = {}".format(fullBed.zmax, fullBed.zmin))
+
     print("Cylinder Radius (with rCylDelta):", R)
     print("Cylinder Height (full):", h)
     print("Bed Height (zmax - zmin):", hBed)
@@ -333,12 +355,15 @@ def main():
     # print("nBeads: ", len(fullBed.beads))
 
     cylvol = pi*R**2*h
+    bedcylvol = pi*R**2*hBed
 
     print("nBeads: ", len(fullBed.beads))
     print("Cylinder Volume:", cylvol)
     print("Packed Bed Volume:", fullBed.volume())
+    print("Bed Cylinder Volume:", pi * R**2 * hBed)
     print("Column Porosity:", 1-(fullBed.volume()/cylvol))
-    print("Bed Porosity:", 1-(fullBed.volume()/fullBed.CylinderVolume))
+    print("Bed Porosity:", 1-(fullBed.volume()/bedcylvol))
+
 
     # # bridgeOffsetRatio = 0.95
     # bridgeOffsetRatio = sqrt(1 - relativeBridgeRadius**2)
@@ -353,6 +378,9 @@ def main():
     print("rmin:", fullBed.rmin)
     print("rmax:", fullBed.rmax)
     print("ravg:", fullBed.ravg)
+
+    if args['dry_run']:
+        sys.exit(0)
 
     volFrac, avgRads = histo([bead.r for bead in fullBed.beads], filename='psdtotal')
 

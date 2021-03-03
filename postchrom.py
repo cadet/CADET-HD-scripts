@@ -212,7 +212,7 @@ def main():
     else:
         print("Bad simtype expression: use 's | n | b' ")
 
-    vol_nume_holdup = num_holdup_vol(t, c, R, u_avg)
+    vol_nume_holdup = num_holdup_vol(t, c, R, u_avg, cin)
 
     print("real Vh = ", vol_real_holdup)
     print("mesh Vh = ", vol_mesh_holdup)

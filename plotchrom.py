@@ -46,9 +46,9 @@ def trapz(y, *args, **kwargs):
          sum = sum + 0.5 * (y[i] + y[i+1]) * (x[i+1] - x[i])
      return sum
 
-def num_holdup_vol(t, c, R, u):
+def num_holdup_vol(t, c, R, u, cin):
     import math
-    cn = [ (1 - elem / c[-1]) for elem in c]
+    cn = [ (1 - elem / cin) for elem in c]
     holdup_num = trapz(cn, x=t) * math.pi * R**2 * u
     return holdup_num
 
@@ -86,8 +86,8 @@ ap.add_argument("-rv", "--rescale-variant", type=float, required=False,
         help="Rescale graph based on y value with multiplicative factor (1/holdup-ratio)")
 ap.add_argument("-sr", "--save-rescaled", required=False,
         help="File to save rescaled data")
-ap.add_argument("-hv", "--holdup-volume", required=False, nargs = 2, type=float,
-        help="File to save rescaled data")
+ap.add_argument("-hv", "--holdup-volume", required=False, nargs = 3, type=float,
+        help="Calculate holdup volume")
 # ap.add_argument("--csv", required=False, action='store_true',
 #         help="input is csv file instead of default space separated")
 ap.add_argument("--to-csv", required=False, action='store_true',
@@ -129,7 +129,7 @@ with plt.style.context(['science']):
             x = rescale(x, args['rescale'])
         if args['rescale_variant']:
             x = rescaleVariant(x, y, args['rescale_variant'])
-        line = ax.plot(x, y, label=label, marker=marker, linestyle=linestyle)
+        line = ax.plot(x, y, label=label.replace('_', '-'), marker=marker, linestyle=linestyle)
         if args['fill']:
             ax.fill_between(x, y, 1, interpolate=True)
         xs.append(x)
@@ -176,7 +176,7 @@ with plt.style.context(['science']):
 
     if args['holdup_volume']:
         for filename,x,y in zip(args['files'], xs, ys):
-            holdup = num_holdup_vol(x, y, args['holdup_volume'][0], args['holdup_volume'][1])
+            holdup = num_holdup_vol(x, y, args['holdup_volume'][0], args['holdup_volume'][1], args['holdup_volume'][2])
             print("{filename}: {holdup}".format(filename=filename, holdup=holdup))
 
 
