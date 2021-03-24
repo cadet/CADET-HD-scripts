@@ -120,13 +120,29 @@ def calcFinalScalingFactor(filename):
     return final_scaling_factor
 
 
+def mixdInfo(filename, length):
+    print("Assuming tetrahedrons.")
+    nen = 4
+    nef = 4
+    nsd = 3
+    ne = 0
+    if 'mien' in filename:
+        ne = length / nen
+        print("ne: {ne}".format(ne=ne))
+    elif 'mxyz' in filename:
+        nn = length / nsd
+        print("nn: {nn}".format(nn=nn))
+    elif 'mrng' in filename:
+        nrng = length / nef ## TODO: check if this is right
+        print("nrng: {nrng}".format(nrng=nrng))
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--plot", action='store_true', help="Plot X Y as scatter plot")
     ap.add_argument("-p", "--print", action='store_true', help="Print to STDOUT")
     ap.add_argument("-a", "--ascii_input", action='store_true', help="input is ascii file")
-    ap.add_argument("-v", "--vartype", help="type of variable stored (d | i)", default='d')
+    ap.add_argument("-v", "--vartype", help="type of variable stored (d | i)", default='d', choices=['d', 'f', 'i'])
     ap.add_argument("-e", "--endianness", help="> or <", default='>')
     ap.add_argument("-n", "--ndf", help="number of items per row", default=1, type=int)
     ap.add_argument("-s", "--split", help="split file into pieces", default = 1, type=int)
@@ -141,6 +157,7 @@ def main():
     ap.add_argument("--nfo", help="Read newly generated packing data and calculate final scaling factor from NFO file.")
     ap.add_argument("--norm", help="Norm order")
     ap.add_argument("--norm-var", help="Calculate Norm for this variable. Index starts at 0.")
+    ap.add_argument("-i", "--info", action='store_true', help="Dump info.")
     ap.add_argument("FILES", nargs='*', help="files")
     args = vars(ap.parse_args())
 
@@ -235,6 +252,14 @@ def main():
         if args['print']:
             for arr in out_arrays:
                 print_data(arr, ndf, vartype)
+
+        if args['info']:
+            for arr in out_arrays:
+                print('Type:', type(arr[0]))
+                print('Serial Length:', len(arr))
+                print('Proper Length:', len(arr) / ndf)
+                mixdInfo(args['FILES'][0], len(arr))
+
 
         # Write to BIN output file
         if args['write']:

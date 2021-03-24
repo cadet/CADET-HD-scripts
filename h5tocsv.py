@@ -18,7 +18,7 @@ Cadet.cadet_path = cadetpath
 
 
 ap = argparse.ArgumentParser()
-ap.add_argument("files", nargs='*', help="h5 files")
+ap.add_argument("-f", "--files", nargs='*', help="h5 files", required=True)
 ap.add_argument("-e", "--extract", nargs='*')
 args = vars(ap.parse_args())
 

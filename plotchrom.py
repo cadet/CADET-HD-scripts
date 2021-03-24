@@ -8,8 +8,16 @@ import matplotlib.pyplot as plt
 import sys
 import argparse
 
+
+# axes.prop_cycle : cycler('color', ['0C5DA5', '00B945', 'FF9500', 'FF2C00', '845B97', '474747', '9e9e9e'])
+
+COLORS = ['#0C5DA5', '#00B945', '#FF9500', '#FF2C00', '#845B97', '#474747', '#9e9e9e']
+
 def normalize(data, refValue):
-    return [ x/refValue for x in data ]
+    if refValue == 'self':
+        print("No reference value for normalization provided: Using last point of curve.")
+        refValue = data[-1]
+    return [ x/float(refValue) for x in data ]
 
 def rescale(data, factor):
     return [x*factor for x in data]
@@ -64,8 +72,12 @@ ap.add_argument("-l", "--labels", required=False, nargs='*',
         help="legend labels")
 ap.add_argument("-ls", "--linestyles", required=False, nargs='*',
         help="linestyles = solid dashed ...")
+ap.add_argument("-lw", "--linewidths", required=False, nargs='*',
+        help="linewidth = 0.1 2 ...")
 ap.add_argument("-m", "--markers", required=False, nargs='*',
         help="markers = s, o, ...")
+ap.add_argument("-c", "--colors", required=False, nargs='*',
+        help="color indices from 1-7 for each line.")
 ap.add_argument("-xl", "--xlims", required=False,nargs=2, type=float,
         help="x axis limits")
 ap.add_argument("-yl", "--ylims", required=False,nargs=2, type=float,
@@ -73,12 +85,18 @@ ap.add_argument("-yl", "--ylims", required=False,nargs=2, type=float,
 ap.add_argument("-f", "--fill", required=False, action='store_true',
         help="fill area under curve")
 ap.add_argument("-n", "--normalize", required=False,
-        help="normalize y data to the reference value")
+        help="normalize y data to the provided reference value or last datapoint ('self')")
 ap.add_argument("-nl", "--no-legend", required=False, action='store_true',
         help="don't show legend")
 ap.add_argument("--legend", required=False, nargs=3, default=['upper center', '0.5', '-0.2'], type=str,
         help="Legend settings: --legend <location> <bbox_to_anchor>")
+ap.add_argument("--legend-size", required=False, default='medium',
+        help="Legend font size:int or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}")
+ap.add_argument("--legend-ncol", required=False, default=1, type=int,
+        help="Number of columns in legend")
 ap.add_argument("-o", "--output", required=False,
+        help="output file")
+ap.add_argument("-s", "--show", required=False, action='store_true',
         help="output file")
 ap.add_argument("-r", "--rescale", type=float, required=False,
         help="Rescale graph with multiplicative factor (1/holdup-ratio)")
@@ -87,7 +105,8 @@ ap.add_argument("-rv", "--rescale-variant", type=float, required=False,
 ap.add_argument("-sr", "--save-rescaled", required=False,
         help="File to save rescaled data")
 ap.add_argument("-hv", "--holdup-volume", required=False, nargs = 3, type=float,
-        help="Calculate holdup volume")
+        help="Calculate holdup volume with R, u, cin")
+
 # ap.add_argument("--csv", required=False, action='store_true',
 #         help="input is csv file instead of default space separated")
 ap.add_argument("--to-csv", required=False, action='store_true',
@@ -109,6 +128,29 @@ if not args['markers']:
 elif len(args['markers']) == 1:
     args['markers'] = args['markers'] * len(args['files'])
 
+
+if not args['linewidths']:
+    args['linewidths'] = [ 2 ] * len(args['files'])
+    # args['linewidths'] = []
+elif len(args['linewidths']) == 1:
+    args['linewidths'] = args['linewidths'] * len(args['files'])
+
+
+if not args['colors']:
+    args['colors'] = COLORS
+elif len(args['colors']) == 1:
+    args['colors'] = args['colors'] * len(args['files'])
+
+new_colors = []
+for color in args['colors']:
+    try:
+        new_colors.append(COLORS[int(color)])
+    except:
+        new_colors.append(color)
+
+args['colors'] = new_colors
+
+
 # if args['csv']:
 #     delimiter = ','
 # else:
@@ -120,16 +162,19 @@ with plt.style.context(['science']):
     ys = []
     lines = []
     count =0
-    for filename,label,linestyle,marker in zip(args['files'], args['labels'], args['linestyles'], args['markers']):
+    for filename,label,linestyle,marker,linewidth,color in zip(args['files'], args['labels'], args['linestyles'], args['markers'], args['linewidths'], args['colors']):
         # x, y = readChromatogram(filename, delimiter)
         x, y = readChromatogram(filename)
         if args['normalize']:
             y = normalize(y, args['normalize'])
+            if args['ylabel'] == 'Concentration':
+                args['ylabel'] = 'Normalized Concentration'
         if args['rescale']:
             x = rescale(x, args['rescale'])
         if args['rescale_variant']:
             x = rescaleVariant(x, y, args['rescale_variant'])
-        line = ax.plot(x, y, label=label.replace('_', '-'), marker=marker, linestyle=linestyle)
+        # line=ax.scatter(x, y)
+        line = ax.plot(x, y, label=label.replace('_', '-'), marker=marker, linestyle=linestyle, linewidth=linewidth, color=color)
         if args['fill']:
             ax.fill_between(x, y, 1, interpolate=True)
         xs.append(x)
@@ -138,7 +183,7 @@ with plt.style.context(['science']):
         count+=1
     if not args['no_legend']:
         # legend = ax.legend(loc='best', shadow=True)
-        legend = ax.legend(loc=args['legend'][0], bbox_to_anchor=(float(args['legend'][1]),float(args['legend'][2])), shadow=True)
+        legend = ax.legend(loc=args['legend'][0], bbox_to_anchor=(float(args['legend'][1]),float(args['legend'][2])), shadow=True, fontsize=args['legend_size'], ncol=args['legend_ncol'])
     ax.set(title=args['title'])
     ax.set(xlabel=args['xlabel'])
     ax.set(ylabel=args['ylabel'])
@@ -149,7 +194,8 @@ with plt.style.context(['science']):
         plt.ylim(args['ylims'])
     if args['output']:
         fig.savefig(args['output'])
-    plt.show()
+    if args['show']:
+        plt.show()
 
 
     if args['save_rescaled']:
@@ -175,6 +221,7 @@ with plt.style.context(['science']):
                 writer.writerows(zip(x, y))
 
     if args['holdup_volume']:
+        print("Holdup volumes calculated with [R,u,cin] = {}".format(args['holdup_volume']))
         for filename,x,y in zip(args['files'], xs, ys):
             holdup = num_holdup_vol(x, y, args['holdup_volume'][0], args['holdup_volume'][1], args['holdup_volume'][2])
             print("{filename}: {holdup}".format(filename=filename, holdup=holdup))

@@ -40,7 +40,7 @@ from paraview.simple import *
 paraview.simple._DisableFirstRenderCameraReset()
 from vtkmodules.numpy_interface import dataset_adapter as dsa
 import vtk.util.numpy_support as ns
-from math import asin,sqrt,pi
+from math import sqrt
 import numpy as np
 import pickle
 import struct
@@ -275,16 +275,19 @@ def geometry_snapshot(reader, args):
     nbeads = int(connectivity.PointData.GetArray("RegionId").GetRange()[1])
     print("Number of Objects:", nbeads)
 
-    for index in range(nbeads):
-        print("Processing bead: {index}".format(index=index))
-        threshold = Threshold(Input=connectivity)
-        threshold.ThresholdRange = [index, index]
-        thresholdDisplay = Show(threshold, renderView1)
-        ColorBy(thresholdDisplay, None)
-        # threshold.UpdatePipeline()
-        thresholdDisplay.AmbientColor = [2/255, 61/255, 107/255]
-        thresholdDisplay.DiffuseColor = [2/255, 61/255, 107/255]
+    ## TODO: just use 0..n as threshold range instead of this nonsense
+    # for index in range(nbeads):
+    # print("Processing bead: {index}".format(index=index))
+    print("Processing beads: {nbeads}".format(nbeads=nbeads))
+    threshold = Threshold(Input=connectivity)
+    threshold.ThresholdRange = [0, nbeads-1]
+    thresholdDisplay = Show(threshold, renderView1)
+    ColorBy(thresholdDisplay, None)
+    # threshold.UpdatePipeline()
+    thresholdDisplay.AmbientColor = [2/255, 61/255, 107/255]
+    thresholdDisplay.DiffuseColor = [2/255, 61/255, 107/255]
 
+    print("Processing Column.")
     threshold = Threshold(Input=connectivity)
     threshold.ThresholdRange = [nbeads, nbeads]
     outerShell = Projection(threshold, 'clip')
@@ -400,9 +403,9 @@ def animate(reader, args):
         print("Animating", colorVar )
 
         if colorVar == 'None':
-            ColorBy(display, None)
+            ColorBy(projectionDisplay, None)
         else:
-            ColorBy(display, ('POINTS', colorVar))
+            ColorBy(projectionDisplay, ('POINTS', colorVar))
 
         ## NOTE: Removing this should HELP fix the varying scalar bar range for every frame
         projectionDisplay.RescaleTransferFunctionToDataRange()

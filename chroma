@@ -177,15 +177,25 @@ def gen_spacetime_mesh(mshfile):
     run_command('gmsh2mixdv2 -d 4 -o ' + config['mesh-order'] + ' ' + mshfile)
     if config['transform'] == 'yes':
         transform_mixd()
+
+    ## Some code in genmesh.F / genmtbl/genmprd etc allows us
+    ## to just duplicate the semidiscrete data to generate the spacetime data.
+    ## To be "proper", we'd have to add an offset (nnspace) to the second half of the mtbl/mprd data
+    ## But so far, XNS has some code and I don't wanna mess with that.
+    run_command('genmprd 0 0 x -readmtbl')
+    run_command('genmprd 0 0 y -readmprd -readmtbl')
+
     shutil.copy('mxyz', 'mxyz.space')
     shutil.copy('mtbl', 'mtbl.space')
+    shutil.copy('mprd', 'mprd.space')
     run_command_in_shell('cat mxyz.space >> mxyz')
     run_command_in_shell('cat mtbl.space >> mtbl')
+    run_command_in_shell('cat mprd.space >> mprd')
     nn = int( run_command('tail -n 1 minf').split()[1] )
     nn_st = nn * 2
     sed_inplace('minf', 'nn', '# nn')
     run_command_in_shell('echo "nn     '+str(nn_st)+'" >> minf')
-    for mfile in ['mien', 'mxyz', 'mrng', 'minf', 'mtbl', 'mmat']:
+    for mfile in ['mien', 'mxyz', 'mrng', 'minf', 'mtbl', 'mmat', 'mprd']:
         shutil.move(mfile, 'MASS/mesh/' + mfile)
     remove_beads()
 

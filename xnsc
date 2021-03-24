@@ -1,10 +1,13 @@
 #!/bin/env bash
+# vim: ft=bash
 
 ## Script to compile XNS (CMake version)
 ## load_modules isn't perfect: 
 
 exec > >(tee "$HOME/xnsc.log") 2>&1
 set -euo pipefail
+
+# TODO: git pull the latest version. Some are develop, others are master.
 
 
 [[ -z "$XNS_DEV_ROOT" ]] && echo "No dev root specified. Please set XNS_DEV_ROOT" && exit
@@ -30,9 +33,9 @@ function preclean()
 function builder()
 {
     
-    ## GCC10 hack
-    export FCFLAGS="-w -fallow-argument-mismatch -O2"
-    export FFLAGS="-w -fallow-argument-mismatch -O2"
+    # ## GCC10 hack
+    # export FCFLAGS="-w -fallow-argument-mismatch -O2"
+    # export FFLAGS="-w -fallow-argument-mismatch -O2"
 
     pkgdir="$1"
     extraargs="$2"
@@ -150,3 +153,4 @@ load_modules
 [ "$build_deps" = "ON" ] && builder "$mathlibdir" "$extraargs"
 [ "$build_deps" = "ON" ] && builder "$sparskitdir" "$extraargs"
 builder "$xnsdir" "$extraargs"
+
