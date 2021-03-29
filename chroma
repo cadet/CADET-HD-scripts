@@ -2,10 +2,11 @@
 
 """
 @desc:  Tool to prepare 3D chromatography meshes for XNS use.
-        Can handle parallel preparation for small meshes locally. (Large meshes backend untested)
+        Can handle parallel preparation (parallel FLOW and MASS prep) for small meshes locally. (Large meshes backend untested)
         Requires gmsh2mixd, shiftmixd, scalemixd, rmmat, gennmat, decompose.metis, and sub.sh
 @auth:  Jayghosh S. Rao
-@usage: ./chrom.py *.msh2 {optional: -e <execstring>}
+@usage: chroma *.msh2 {optional: -e <execstring>}
+@usage: chroma --restart previous
 """
 
 import re
@@ -20,31 +21,26 @@ from os import environ, chdir
 from tempfile import NamedTemporaryFile
 from multiprocessing import Pool, current_process
 
+def find_up_recursive(name, startdir='.', stopdir='~'):
+    path = Path(startdir).resolve()                   ## start searching in startdir
+    stop = Path(stopdir).resolve().parent.resolve()   ## search in the stopdir, but not beyond. stopdir is inclusive
+    print('Searching recursively until', Path(stopdir).resolve() )
+    while path != stop:
+        res = [ x for x in path.rglob(name)]
+        if res:
+            return res[0]
+        path = path.parent
 
-# DONE: refactor all os.path -> pathlib
-# DONE: keep xns.mass.in and xns.flow.in in root, and copy these to the appropriate subdirs.
-# DONE: shutil copy and move and makedir fails if dir exists
-# DONE: Verbose option: Write output to log
-# DONE: Parallelize: multiple FILES: ensure mshfile, dir is passed
-# DONE: check if srun produces stderr
-# DONE: Allow resuming execution order
-# DONE: individual threads log to file
-# DONE: setup setstage on mass templates
-# DONE: Easy re-submit when xns.in needs changing
-# TODO: Make idempotent: if results of current step exists, don't do the current step (or overwrite?).
 # TODO: phase out sub.sh?
-# TODO: On JURECA: devel salloc has limit of 2 hours. If mesh is larger, multiple meshes can't be done together.# TODO: backend decompose is not perfect with multi: srun produced error. temp fixed
-# DONE: Setup to work on IBT servers properly: decompose requires intel compiler, cant use elsewhere
-# TODO: integrate with mixdtools: extractts etc to enable restart simulations better
-# DONE: Parallelize dependent tools: only gmsh2mixdv2 is parallel
+# TODO: On JURECA: devel salloc has limit of 2 hours. If mesh is larger, multiple meshes can't be done together.
+# TODO: (backend) decompose load required modules
+# TODO: backend decompose is not perfect with multi: srun produced error. temp fixed
 # TODO: meta-wrapper where I can specify a table of data that runs multiple simulations
-# DONE: Parallellize workflow/algorithm: gen_spacetime_mesh -> 1. pf 2. pm
-# DONE: consider more nodes allocated for decompose operation (in case of large meshes)
 # TODO: vipe the config if it doesn't exist
 # TODO: handle second order and first order meshes: Allow specifying the full gendual/genneim and other commands in the config file.
-# TODO: Fix gennmat
 # TODO: kernel optional argument mshfile
 # TODO: kernel async pool decompose mass fix
+# TODO: Stop using job.sh template file. Build it.
 
 # For use with slurm:
 # $ export PYTHONPATH=${PYTHONPATH}:$LMOD_DIR/../init
@@ -52,10 +48,10 @@ from multiprocessing import Pool, current_process
 # module('list')
 
 if environ.get('LMOD_DIR'):
-    from env_modules_python import module # pylint: disable=import-error
+    from env_modules_python import module # type: ignore
 
 execstring=None
-CONFIGFILE = 'config.json'
+CONFIGFILE = 'chroma.json'
 STAGE = 'Stages/2018a'
 TEMPLATEDIR = Path('~/templates').expanduser()
 config = {}
@@ -121,7 +117,7 @@ def run_command(cmdstring):
 
 def check_prerequisites():
     print("Checking Prerequisites...")
-    programs = ['gmsh2mixdv2', 'shiftmixd', 'scalemixd', 'rmmat', 'gennmat', 'decompose.metis']
+    programs = ['gmsh2mixdv2', 'shiftmixd', 'scalemixd', 'rmmat', 'gennmat', 'decompose.metis', 'genmprd', 'dumpy']
     prgExists = [(shutil.which(prg) is not None) for prg in programs]
     if False in prgExists:
         print("\n".join("{}: {}".format(x,y) for x, y in zip(programs, prgExists)))
@@ -163,9 +159,9 @@ def edit_files():
 
 def set_stage():
     if environ.get('LMOD_DIR'):
-        module('--force purge')
-        module('use /usr/local/software/jureca/OtherStages')
-        module('load ' + STAGE)
+        # module('--force purge')
+        # module('use /usr/local/software/jureca/OtherStages')
+        # module('load ' + STAGE)
         module('load intel-para Boost flex')
 
 
@@ -175,15 +171,17 @@ def transform_mixd():
 
 def gen_spacetime_mesh(mshfile):
     run_command('gmsh2mixdv2 -d 4 -o ' + config['mesh-order'] + ' ' + mshfile)
+    # run_command('gmsh2mixd_3D -d 4 -m sd ' + mshfile)
     if config['transform'] == 'yes':
         transform_mixd()
 
-    ## Some code in genmesh.F / genmtbl/genmprd etc allows us
+    ## Some code in XNS: genmesh.F / genmtbl()/genmprd() etc allows us
     ## to just duplicate the semidiscrete data to generate the spacetime data.
+    ## So we just generate mtbl and mprd for semidiscrete meshes and then double it.
     ## To be "proper", we'd have to add an offset (nnspace) to the second half of the mtbl/mprd data
-    ## But so far, XNS has some code and I don't wanna mess with that.
-    run_command('genmprd 0 0 x -readmtbl')
-    run_command('genmprd 0 0 y -readmprd -readmtbl')
+    if config['periodic'] == 'yes':
+        run_command('genmprd 0 0 x -readmtbl')
+        run_command('genmprd 0 0 y -readmprd -readmtbl')
 
     shutil.copy('mxyz', 'mxyz.space')
     shutil.copy('mtbl', 'mtbl.space')
@@ -206,12 +204,15 @@ def remove_beads():
     chdir(root)
     # partition_flow()
 
+    if config['periodic'] == 'yes':
+        run_command('genmprd 0 0 x')
+        run_command('genmprd 0 0 y -readmprd')
+
     with Pool(processes=2) as pool:
         pool.apply_async(partition_flow)
         pool.apply_async(partition_mass)
         pool.close()
         pool.join()
-
 
 def partition_flow():
     root = Path.cwd()
@@ -230,16 +231,26 @@ def decompose_flow():
     root = Path.cwd()
     chdir('FLOW/mesh/')
 
-    if config['decompose'] == 'yes':
-        if config['decompose-mpi'] == 'yes':
-            run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e '+ ETYPE + '-w -p ' + config['job-cpus'])
-        elif config['decompose-backend'] == 'yes':
-            run_command('srun -N ' + config['decompose-N'] + ' -n' + config['decompose-np'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-part'] + ' decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
-        else:
-            run_command('decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
+    # if config['decompose'] == 'yes':
+    #     if config['decompose-mpi'] == 'yes':
+    #         run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e '+ ETYPE + '-w -p ' + config['job-cpus'])
+    #     elif config['decompose-backend'] == 'yes':
+    #         run_command('srun -N ' + config['decompose-N'] + ' -n' + config['decompose-np'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-part'] + ' decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
+    #     else:
+    #         run_command('decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
+    # else:
+    #     reprint("Not decomposing mesh")
 
-    else:
+    if config['decompose'] == 'no':
         reprint("Not decomposing mesh")
+    elif config['decompose'] == 'yes':
+        run_command('decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
+    elif config['decompose'] == 'mpi':
+        run_command('mpiexec -np ' + config['decompose-nprocs'] + ' decompose.metis -e '+ ETYPE + '-w -p ' + config['job-cpus'])
+    elif config['decompose'] == 'backend':
+        if environ.get('LMOD_DIR'):
+            module('load GCC/9.3.0 ParaStationMPI/5.4.7-1 ParMETIS/4.0.3-double Boost')
+        run_command('srun -N ' + config['decompose-nnodes'] + ' -n' + config['decompose-nprocs'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-backend'] + ' decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
 
     chdir(root)
     setup_flow()
@@ -261,16 +272,28 @@ def decompose_mass():
     root = Path.cwd()
     chdir('MASS/mesh/')
 
-    if config['decompose'] == 'yes':
-        if config['decompose-mpi'] == 'yes':
-            run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
-        elif config['decompose-backend'] == 'yes':
-            run_command('srun -N ' + config['decompose-N'] + ' -n' + config['decompose-np'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-part'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
-        else:
-            run_command('decompose.metis -e '+ ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
-    else:
-        reprint("Not decomposing mesh")
+    # if config['decompose'] == 'yes':
+    #     if config['decompose-mpi'] == 'yes':
+    #         run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
+    #     elif config['decompose-backend'] == 'yes':
+    #         run_command('srun -N ' + config['decompose-N'] + ' -n' + config['decompose-np'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-part'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
+    #     else:
+    #         run_command('decompose.metis -e '+ ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
+    # else:
+    #     reprint("Not decomposing mesh")
 
+    if config['decompose'] == 'no':
+        reprint("Not decomposing MASS mesh")
+    elif config['decompose'] == 'yes':
+        run_command('decompose.metis -e '+ ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
+    elif config['decompose'] == 'mpi':
+        run_command('mpiexec -np ' + config['decompose-nprocs'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
+    elif config['decompose'] == 'backend':
+        if environ.get('LMOD_DIR'):
+            module('load GCC/9.3.0 ParaStationMPI/5.4.7-1 ParMETIS/4.0.3-double Boost')
+        run_command('srun -N ' + config['decompose-nnodes'] + ' -n' + config['decompose-nprocs'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-backend'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
+
+    ## TODO: check that this is proper
     run_command('gennmat ' + NEN + ' st')
     chdir(root)
     setup_mass()
@@ -309,6 +332,9 @@ def setup_mass():
     chdir(root)
     # submit_sims()
 
+##
+## !!!! Untested & mostly unused
+##
 def submit_sims():
     root = Path.cwd()
     if config['submit'] == 'yes':
@@ -336,20 +362,19 @@ def create_config():
     config["transform"] = "no"
     config["shift"] = ""
     config["scale"] = ""
+    config["periodic"] = "no"
     config["job-name"] = "DIR"
-    config["job-cpus"] = "240"
+    config["job-cpus"] = "512"
     config["job-acct"] = "jibg12"
     config["job-part"] = "batch"
     config["job-flowtime"] = "02:00:00"
-    config["job-masstime"] = "12:00:00"
+    config["job-masstime"] = "24:00:00"
     config["xns-path"] = "~/bin/xns-mpi"
     config["partition"] = "yes"
     config["decompose"] = "no"
-    config["decompose-mpi"] = "no"
-    config["decompose-backend"] = "no"
-    config["decompose-part"] = "devel"
-    config["decompose-np"] = "24"
-    config["decompose-N"] = "5"
+    config["decompose-backend"] = "dc-cpu-devel"
+    config["decompose-np"] = "128"
+    config["decompose-N"] = "2"
     config["submit"] = "no"
 
     with open(CONFIGFILE, 'w') as json_file:
@@ -357,12 +382,17 @@ def create_config():
 
 
 def kernel(mshfile):
+    """
+    This function should be renamed to driver or controller or something.
+    """
     root = Path.cwd()
     # base, mshfile = os.path.split(os.path.abspath(mshfile))
     mshfile = Path(mshfile).absolute().name
     base = Path(mshfile).absolute().parent
     chdir(base)
     read_config()
+
+    execstring = args['execute']
 
     if (execstring is None):
         setup_dirs()
@@ -402,6 +432,69 @@ def kernel(mshfile):
 
     chdir(root)
 
+def restart(directory):
+    """
+    Ideally i'd like this script to handle the work that goes into restarting of xns sims,
+    but on a cluster, shell scripts are the best since they don't need any dependent modules.
+    so I'll continue to use postsim.sh on JURECA even though it pains me.
+
+    @deps: exts (extract data.out->data.in from data.all) (perhaps use dumpy for this?)
+    @deps: sed_inplace
+    """
+    # findup mesh dir -> minf -> nn
+    print("restarting xns chromatography simulation...")
+    minffile = find_up_recursive('minf', stopdir='..')
+
+    if minffile:
+        print("Found minf!")
+    else:
+        raise(FileNotFoundError)
+
+    nn = 0
+    with open(minffile.resolve(), 'r') as minf:
+        for line in minf:
+            if line.strip()[0] != '#':
+                if 'nn' in line:
+                    nn = int(line.split()[1])
+    print("nn:", nn)
+
+    # Get nrec from data.all
+    data_all_size = Path('data.all').stat().st_size
+    nrec = data_all_size / (nn * 2 * 8)             ## ndf = 2, sizeof(double) = 8
+    lastrec = nrec-1
+
+    print("nrec:", nrec)
+    print("extracting last record with index:", lastrec)
+
+    # dumpy data.all --extract-slice data.in --nrows nn --ndf 2 --skip <>
+    run_command_in_shell("dumpy data.all --extract-slice data.in --nrows {nn} --ndf 2 --skip {lastrec}".format(nn=nn, lastrec=int(lastrec)))
+
+    print("moving files...")
+
+    # move/copy files to new directory
+    Path(directory).mkdir()
+    shutil.move(Path('chromatogram'), Path(directory))
+    shutil.move(Path('data.all'), Path(directory))
+    shutil.move(Path('xns.log'), Path(directory))
+    shutil.copy(Path('xns.in'), Path(directory))
+    shutil.copy(Path('.xns.time'), Path(directory))
+    for item in Path('.').glob('out-*'):
+        shutil.move(item, Path(directory))
+    for item in Path('.').glob('*.err'):
+        shutil.move(item, Path(directory))
+
+    # get new starttime
+    starttime = 0
+    with open('.xns.time', 'r') as timefile:
+        starttime = float(timefile.read())
+
+    print("starttime:", starttime)
+
+    print("modifying xns.in with 'restart on' and 'starttime {starttime}'".format(starttime=starttime))
+    # edit xns.in/job.sh as required
+    sed_inplace('xns.in', r'restart\s+off', 'restart on')
+    sed_inplace('xns.in', r'starttime\s.*', 'starttime {starttime}'.format(starttime=starttime))
+
 def reprint(string):
     thread = current_process().name
     print(thread, ": " , string)
@@ -409,24 +502,30 @@ def reprint(string):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-c", "--create-config", action='store_true', help="create an example config.json")
-    ap.add_argument("-e", "--execute", help="create an example config.json")
+    ap.add_argument("-e", "--execute", help="execstring", choices=['rmmat', 'part', 'pf', 'pm', 'dec', 'df', 'dm', 'set', 'sub', 'edit'])
+    ap.add_argument("-r", "--restart", help="restart chromatography simulation in current simulation directory. Provide name of new folder to store old data")
     ap.add_argument("FILES", nargs='*', help="files")
+    global args
     args = vars(ap.parse_args())
 
     if args['create_config']:
-        print("Config file created")
         create_config()
+        print("Config file created")
         sys.exit(0)
 
-    global execstring
-    execstring = args['execute']
+    # ## TODO: unglobal this
+    # global execstring
+    # execstring = args['execute']
 
     # check_prerequisites()
     set_stage()
 
-    ## serial execution
-    for mshfile in args['FILES']:
-        kernel(mshfile)
+    if args['restart']:
+        restart(args['restart'])
+    else:
+        ## serial execution
+        for mshfile in args['FILES']:
+            kernel(mshfile)
 
     print("Done!")
 
