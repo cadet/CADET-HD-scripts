@@ -6,20 +6,15 @@
 @usage: ./dumpy <FILES> {-w outfile | -p} {-s <number of splits>} {-v <d | i>} {-z} {-d}
 @help: ./dumpy -h
 @examples:
-    $ dumpy mrng -v i -p -n 4 | vim
+    $ dumpy mrng -v i -p -n 4 | vipe
     $ dumpy two-spheres.ascii -v f -e '<' -w two-spheres.xyzd -a
     $ dumpy two-spheres.xyzd0 -v f -e '<' -p
     $ dumpy --packing packing.xyzd --nfo packing.nfo -w fixed.xyzd
     $ dumpy dummy --fill <value> <n_nodes> -n <ndf> -w dummy -v <vartype>
+    $ dumpy data.all --extract-slice data.test.last --nrows 4762 --ndf 2 --skip 25
 """
 
-# TODO: assert array element sizes before writing (int: 4 bytes, float: 4 bytes, double: 8 bytes)
-# DONE: in unchunked files, don't append 0 to output filename
-# DONE: Handle packing file and particle diameter scaling? Scale every nth value (scale-step?) by sf (scale-factor
-
-# TODO: Create or Fill files with values (zeroes, custom values etc) for testing
-
-# DONE: matplotlib for top view/side view of column?
+# TODO: Test extract_slice on large files (will there be overflows?)
 
 from __future__ import print_function
 
@@ -30,9 +25,12 @@ import itertools
 import numpy as np
 import matplotlib.pyplot as plt
 
-def bin_to_arr(filename, f):
+def bin_to_arr(filename, dataformat, skip=0, skiprows=0, nrows=0, ncols=0):
+    datasize = dataformatsize(dataformat)
+
     with(open(filename, 'rb')) as input:
-        myiter = struct.iter_unpack(f, input.read())
+        input.seek(skip * nrows * ncols * datasize + skiprows * ncols * datasize, 0)
+        myiter = struct.iter_unpack(dataformat, input.read())
 
         arr = []
         for i in myiter:
@@ -43,10 +41,39 @@ def bin_to_arr(filename, f):
         # arr2 = arr[len(arr)//2:]
         # arr2 = arr[0:len(arr)//2]
 
-def arr_to_bin(arr, filename, f):
+def extract_slice(src, dest, dataformat, bufsize, skip=0, skiprows=0, nrows=0, ncols=0):
+    """
+    Good for slicing/extracting ts from data.all
+    """
+    datasize = dataformatsize(dataformat)
+    length = nrows * ncols * datasize
+
+    print("nrows = {nrows}\nncols = {ncols}".format(nrows=nrows, ncols=ncols))
+
+    with open(src,'rb') as f1:
+        f1.seek(skip * nrows * ncols * datasize + skiprows * ncols * datasize, 0)
+        with open(dest,'wb') as f2:
+            while length:
+                chunk = min(bufsize,length)
+                data = f1.read(chunk)
+                f2.write(data)
+                length -= chunk
+
+def dataformatsize(dataformat):
+    vartype = dataformat[1]
+    datasize = 0
+    if vartype == 'd':
+        datasize = 8
+    elif vartype == 'f':
+        datasize = 4
+    elif vartype == 'i':
+        datasize = 4
+    return datasize
+
+def arr_to_bin(arr, filename, dataformat):
     with(open(filename, 'wb')) as output:
         for i in arr:
-            output.write(struct.pack(f, i))
+            output.write(struct.pack(dataformat, i))
 
 def arr_to_ascii(arr, filename):
     with(open(filename, 'w')) as output:
@@ -120,7 +147,7 @@ def calcFinalScalingFactor(filename):
     return final_scaling_factor
 
 
-def mixdInfo(filename, length):
+def mixdInfo(filename, length, nrows, ncols):
     print("Assuming tetrahedrons.")
     nen = 4
     nef = 4
@@ -135,6 +162,9 @@ def mixdInfo(filename, length):
     elif 'mrng' in filename:
         nrng = length / nef ## TODO: check if this is right
         print("nrng: {nrng}".format(nrng=nrng))
+    elif 'data' in filename:
+        nrec = length / (nrows * ncols)
+        print("nrec: {nrec}".format(nrec=nrec))
 
 
 def main():
@@ -144,7 +174,8 @@ def main():
     ap.add_argument("-a", "--ascii_input", action='store_true', help="input is ascii file")
     ap.add_argument("-v", "--vartype", help="type of variable stored (d | i)", default='d', choices=['d', 'f', 'i'])
     ap.add_argument("-e", "--endianness", help="> or <", default='>')
-    ap.add_argument("-n", "--ndf", help="number of items per row", default=1, type=int)
+    ap.add_argument("-n", "--ndf", help="number of items per row, or ncols", default=1, type=int)
+    ap.add_argument("-m", "--nrows", help="number of rows. necessary when using --skip or --skiprows", default=0, type=int) ## Default=0 turns off skipping
     ap.add_argument("-s", "--split", help="split file into pieces", default = 1, type=int)
     ap.add_argument("-w", "--write", help="write to bin file")
     ap.add_argument("-so", "--scale-offset", help="Scale every ndf'th number starting from scale-offset. Index starts from 0.", default=0, type=int)
@@ -152,6 +183,14 @@ def main():
     ap.add_argument("-z", "--zero-pad", action='store_true', help="Pre-pad file with zeroes")
     ap.add_argument("-d", "--double", action='store_true', help="Double the file. Useful for converting semi-discrete to space-time data, although cat is better.")
     ap.add_argument("-f", "--fill", nargs=2, default = [0, 0], help="Fill the given file with values")
+
+    # TODO:
+    ap.add_argument("--skip", type=int, default=0, help="Skip <n> steps of the BINARY input file") ## n * rows * cols
+    ap.add_argument("--skiprows", type=int, default=0, help="Skip <n> rows of the BINARY input file. Requires specifying --nrows.") ## n * cols
+    ap.add_argument("--fastwrite", help="Quick write out to file without storing full data in RAM.")
+    ap.add_argument("--extract-slice", help="Quick write out to file without storing full data in RAM.")
+    ap.add_argument("--bufsize", help="Read/write buffer size for --extract-slice. Default = nrows * ncols * datasize (the length of 1 step of the input data)", type=int)
+
     ap.add_argument("--dpacking", action='store_true', help="Input file is packing.xyzd with e=< and n=4 v=d.")
     ap.add_argument("--fpacking", action='store_true', help="Input file is packing.xyzd with e=< and n=4 v=f.")
     ap.add_argument("--nfo", help="Read newly generated packing data and calculate final scaling factor from NFO file.")
@@ -182,6 +221,9 @@ def main():
     ndf = args['ndf']
     endianness = args['endianness']
     dataformat = endianness + vartype
+    # datasize = 0
+
+
 
     scale_offset= args['scale_offset']
     scale_factor = args['scale_factor']
@@ -201,11 +243,25 @@ def main():
         # Input
         print("Infile: ", infile, file=sys.stderr)
 
+        if args['extract_slice']:
+            if args['nrows'] == 0:
+                ap.error("--extract-slice requires -m/--nrows and -n/--ndf to be set properly.")
+
+            if args['bufsize']:
+                bufsize = args['bufsize']
+            else:
+                bufsize = args['nrows'] * args['ndf'] * dataformatsize(dataformat)
+
+            print("Extracting slice using buffer size:", bufsize)
+            extract_slice(infile, args['extract_slice'], dataformat, bufsize, skip=args['skip'], skiprows=args['skiprows'], nrows=args['nrows'], ncols=args['ndf'])
+
+            break
         if args['ascii_input']:
             array = ascii_to_arr(infile, vartype)
         else:
-            array = bin_to_arr(infile, dataformat)
+            array = bin_to_arr(infile, dataformat, skip=args['skip'], skiprows=args['skiprows'], nrows=args['nrows'], ncols=args['ndf'])
 
+        ## TODO: Clean this up
         ## Apply scale_factor to every ndf'th number
         ## Best for scaling the last variable (step = n), or the entire column (step = 1)
         array[scale_offset::args['ndf']] = [x*scale_factor for x in array[scale_offset::args['ndf']]]
@@ -258,7 +314,7 @@ def main():
                 print('Type:', type(arr[0]))
                 print('Serial Length:', len(arr))
                 print('Proper Length:', len(arr) / ndf)
-                mixdInfo(args['FILES'][0], len(arr))
+                mixdInfo(args['FILES'][0], len(arr), args['nrows'], args['ndf'])
 
 
         # Write to BIN output file
