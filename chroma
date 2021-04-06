@@ -9,6 +9,17 @@
 @usage: chroma --restart previous
 """
 
+# TODO: phase out sub.sh?
+# TODO: On JURECA: devel salloc has limit of 2 hours. If mesh is larger, multiple meshes can't be done together.
+# TODO: (backend) decompose load required modules
+# TODO: backend decompose is not perfect with multi: srun produced error. temp fixed
+# TODO: meta-wrapper where I can specify a table of data that runs multiple simulations
+# TODO: vipe the config if it doesn't exist
+# TODO: handle second order and first order meshes: Allow specifying the full gendual/genneim and other commands in the config file.
+# TODO: kernel optional argument mshfile
+# TODO: kernel async pool decompose mass fix
+# TODO: Stop using job.sh template file. Build it.
+
 import re
 import sys
 import json
@@ -21,6 +32,9 @@ from os import environ, chdir
 from tempfile import NamedTemporaryFile
 from multiprocessing import Pool, current_process
 
+if environ.get('LMOD_DIR'):
+    from env_modules_python import module # type: ignore
+
 def find_up_recursive(name, startdir='.', stopdir='~'):
     path = Path(startdir).resolve()                   ## start searching in startdir
     stop = Path(stopdir).resolve().parent.resolve()   ## search in the stopdir, but not beyond. stopdir is inclusive
@@ -30,25 +44,6 @@ def find_up_recursive(name, startdir='.', stopdir='~'):
         if res:
             return res[0]
         path = path.parent
-
-# TODO: phase out sub.sh?
-# TODO: On JURECA: devel salloc has limit of 2 hours. If mesh is larger, multiple meshes can't be done together.
-# TODO: (backend) decompose load required modules
-# TODO: backend decompose is not perfect with multi: srun produced error. temp fixed
-# TODO: meta-wrapper where I can specify a table of data that runs multiple simulations
-# TODO: vipe the config if it doesn't exist
-# TODO: handle second order and first order meshes: Allow specifying the full gendual/genneim and other commands in the config file.
-# TODO: kernel optional argument mshfile
-# TODO: kernel async pool decompose mass fix
-# TODO: Stop using job.sh template file. Build it.
-
-# For use with slurm:
-# $ export PYTHONPATH=${PYTHONPATH}:$LMOD_DIR/../init
-# >>> from env_modules_python import module
-# module('list')
-
-if environ.get('LMOD_DIR'):
-    from env_modules_python import module # type: ignore
 
 execstring=None
 CONFIGFILE = 'chroma.json'
@@ -179,9 +174,11 @@ def gen_spacetime_mesh(mshfile):
     ## to just duplicate the semidiscrete data to generate the spacetime data.
     ## So we just generate mtbl and mprd for semidiscrete meshes and then double it.
     ## To be "proper", we'd have to add an offset (nnspace) to the second half of the mtbl/mprd data
-    if config['periodic'] == 'yes':
+    if 'xy' in config['periodic']:
         run_command('genmprd 0 0 x -readmtbl')
         run_command('genmprd 0 0 y -readmprd -readmtbl')
+    if 'z' in config['periodic']:
+        run_command('genmprd 0 0 z -readmprd -readmtbl')
 
     shutil.copy('mxyz', 'mxyz.space')
     shutil.copy('mtbl', 'mtbl.space')
@@ -204,9 +201,11 @@ def remove_beads():
     chdir(root)
     # partition_flow()
 
-    if config['periodic'] == 'yes':
+    if 'xy' in config['periodic']:
         run_command('genmprd 0 0 x')
         run_command('genmprd 0 0 y -readmprd')
+    if 'z' in config['periodic']:
+        run_command('genmprd 0 0 z -readmprd')
 
     with Pool(processes=2) as pool:
         pool.apply_async(partition_flow)
