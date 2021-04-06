@@ -12,6 +12,9 @@
     $ dumpy --packing packing.xyzd --nfo packing.nfo -w fixed.xyzd
     $ dumpy dummy --fill <value> <n_nodes> -n <ndf> -w dummy -v <vartype>
     $ dumpy data.all --extract-slice data.test.last --nrows 4762 --ndf 2 --skip 25
+
+Alternatives: od (octaldump) to convert from bin->ascii
+    $ od -A n -t fD --endian=big -w24 mxyz
 """
 
 # TODO: Test extract_slice on large files (will there be overflows?)

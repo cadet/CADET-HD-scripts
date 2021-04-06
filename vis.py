@@ -34,12 +34,17 @@ Usage notes:
 ## TODO: Automatic filetype detection
 ## TODO: Easy way to select "Solid Color"
 
+
+## TODO: get min/max over all timesteps for scalarBar for animations etc
+# You could run Temporal Statistics to get Max and Min over entire time range, then run calculator to get Range as (Max-Min).
+# Then you could run your filter on this and use the variable from the calculator.
+
 import argparse
 from matplotlib import pyplot as plt
 from paraview.simple import *
 paraview.simple._DisableFirstRenderCameraReset()
 from vtkmodules.numpy_interface import dataset_adapter as dsa
-import vtk.util.numpy_support as ns
+import vtk.util.numpy_support as ns #type:ignore
 from math import sqrt
 import numpy as np
 import pickle
@@ -113,7 +118,7 @@ def bead_loading(reader, args):
 
     appendToBin([nts, nbeads, ncv],'bead_loading.inf', '=i')
     dataArr = np.zeros((nts, nbeads, ncv))
-    coordArr = np.zeros((nbeads,4))
+    # coordArr = np.zeros((nbeads,4))
 
 
     for timestep in range(nts):
@@ -318,9 +323,13 @@ def snapshot(reader, args):
     filetype = args['filetype']
     projectionType = args['projectionType']
 
+
+    ## TODO: implement cutting plane coordinates
     projection = Projection(reader, projectionType)
+    # Render()
 
     renderView1 = GetActiveViewOrCreate('RenderView')
+    # renderView1 = GetActiveView()
     display = Show(projection, renderView1)
     display.Representation = args['display_representation']
     renderView1.OrientationAxesVisibility = int(axisVisible)
@@ -328,6 +337,8 @@ def snapshot(reader, args):
     renderView1.Update()
     renderView1.ResetCamera()
     renderView1.ViewSize = geometry
+
+    display.UpdatePipeline()
 
     setCameraOrientation(zoom)
 
@@ -608,13 +619,23 @@ def setCameraOrientation(zoom):
     # camera.SetPosition(cx/zoom[0], cy/zoom[0], cz/zoom[0])
     # Render()
 
+## Ideally Projection(inputView, projectionType, direction, depth fraction)
 def Projection(inputView, projectionType):
+
+    renderViewForProjection = GetActiveViewOrCreate('RenderView')
+    display = Show(inputView, renderViewForProjection)
+    (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+    Hide(inputView, renderViewForProjection)
+    center = [ (xmax+xmin)/2, (ymax+ymin)/2, (zmax+zmin)/2,]
+
     projection = None
     if projectionType == 'clip':
         projection = Clip(Input=inputView)
+        projection.ClipType.Origin = center
         Hide3DWidgets(proxy=projection.ClipType)
     elif projectionType == 'slice':
         projection = Slice(Input=inputView)
+        projection.SliceType.Origin = center
         Hide3DWidgets(proxy=projection.SliceType)
     else:
         projection = inputView
