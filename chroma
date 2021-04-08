@@ -293,7 +293,7 @@ def decompose_mass():
         run_command('srun -N ' + config['decompose-nnodes'] + ' -n' + config['decompose-nprocs'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-backend'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
 
     ## TODO: check that this is proper
-    run_command('gennmat ' + NEN + ' st')
+    run_command('gennmat ' + NEN + 'st')
     chdir(root)
     setup_mass()
 
