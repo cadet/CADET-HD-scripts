@@ -19,12 +19,14 @@ Algorithm:
 ## TODO: General refactoring and cleanup
 ## TODO: cmdline arg/flag to dump output images
 ## TODO: Debug mode to dump threshold boundary and ring width
+## TODO: Implement axial averaging (in batches based on 2DGRM discretization)
 
 from PIL import Image
 from PIL import ImageEnhance
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
+import csv
 
 # enhanceFactor = 1.5 ## Factor by which to enhance image contrast
 # threshold     = 180 ## Brightness threshold to consider as beads/pores
@@ -82,16 +84,16 @@ print("Centers:", xc, yc)
 
 
 ##Visual debug
-#arr = np.zeros((arr.shape[0], arr.shape[1]))
-#r = rad
+## arr = np.zeros((arr.shape[0], arr.shape[1]))
+#r = rad/2
 #mask = np.logical_and( (x[np.newaxis,:]-xc)**2 + (y[:,np.newaxis]-yc)**2 <= (r+half_width)**2, (x[np.newaxis,:]-xc)**2 + (y[:,np.newaxis]-yc)**2 >= (r-half_width)**2)
-#arr[mask] = 255
-## arr[mask] = 0
+## arr[mask] = 255
+#arr[mask] = 0
 #fig = plt.figure()
 #plt.pcolormesh(x, y, arr)
 #plt.colorbar()
 #plt.show()
-##fig.savefig("image_sample.png")
+#fig.savefig("microct-image-400_sample_ring.png")
 
 ## Output lists
 out_rad = []
@@ -113,3 +115,8 @@ fig = plt.figure()
 plt.plot(out_rad, out_por)
 plt.show()
 # fig.savefig("image_rad_por.png")
+
+with open(args['FILE']+'_rad_por.csv', 'w') as f:
+    writer = csv.writer(f, delimiter=',')
+    writer.writerows(zip(out_rad, out_por))
+
