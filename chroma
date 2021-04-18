@@ -182,30 +182,37 @@ def gen_spacetime_mesh(mshfile):
 
     shutil.copy('mxyz', 'mxyz.space')
     shutil.copy('mtbl', 'mtbl.space')
-    shutil.copy('mprd', 'mprd.space')
     run_command_in_shell('cat mxyz.space >> mxyz')
     run_command_in_shell('cat mtbl.space >> mtbl')
-    run_command_in_shell('cat mprd.space >> mprd')
+
+    if config['periodic'] != "no":
+        shutil.copy('mprd', 'mprd.space')
+        run_command_in_shell('cat mprd.space >> mprd')
+
+    shutil.copy("minf", "minf.space")
     nn = int( run_command('tail -n 1 minf').split()[1] )
     nn_st = nn * 2
     sed_inplace('minf', 'nn', '# nn')
     run_command_in_shell('echo "nn     '+str(nn_st)+'" >> minf')
-    for mfile in ['mien', 'mxyz', 'mrng', 'minf', 'mtbl', 'mmat', 'mprd']:
-        shutil.move(mfile, 'MASS/mesh/' + mfile)
+    for mfile in ['mien', 'mxyz', 'mrng', 'minf', 'mtbl', 'mmat', 'mprd', 'mtbl.space', 'mxyz.space', 'mtbl.dual', 'minf.space']:
+        try:
+            shutil.move(mfile, 'MASS/mesh/' + mfile)
+        except:
+            print("Couldn't move", mfile, "!")
     remove_beads()
 
 def remove_beads():
     root = Path.cwd()
     chdir('MASS/mesh/')
     run_command('rmmat -'+ ETYPE + '-st ../../FLOW/mesh 2')
-    chdir(root)
-    # partition_flow()
 
     if 'xy' in config['periodic']:
         run_command('genmprd 0 0 x')
         run_command('genmprd 0 0 y -readmprd')
     if 'z' in config['periodic']:
         run_command('genmprd 0 0 z -readmprd')
+
+    chdir(root)
 
     with Pool(processes=2) as pool:
         pool.apply_async(partition_flow)

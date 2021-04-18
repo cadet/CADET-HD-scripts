@@ -121,16 +121,16 @@ def grouper(iterable, n):
            return
        yield chunk
 
-def scatterPlot(x, y):
+def scatterPlot(x, y, xlabel='X', ylabel='Y', view='Top'):
     fig, ax = plt.subplots()
     ax.scatter(x, y)
     ax.legend(loc='best', shadow=True)
-    ax.set(title='Top View')
-    ax.set(xlabel='X')
-    ax.set(ylabel='Y')
+    ax.set(title=view + 'View')
+    ax.set(xlabel=xlabel)
+    ax.set(ylabel=ylabel)
     ax.autoscale(tight=True)
-    fig.savefig('plot.pdf')
-    fig.savefig('plot.jpg', dpi=300)
+    fig.savefig(view + '.pdf')
+    fig.savefig(view + '.jpg', dpi=300)
     # plt.show()
 
 def calcFinalScalingFactor(filename):
@@ -335,7 +335,9 @@ def main():
             for arr in out_arrays:
                 x = [ arr[i] for i in range(len(arr)) if i%4 == 0 ]
                 y = [ arr[i] for i in range(len(arr)) if i%4 == 1 ]
+                z = [ arr[i] for i in range(len(arr)) if i%4 == 2 ]
                 scatterPlot(x,y)
+                scatterPlot(x,z, ylabel='Z', view='Side')
 
 if __name__ == "__main__":
     # print(__doc__)

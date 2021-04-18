@@ -59,6 +59,10 @@ def loadh5(col_dispersion, filename, ref_curve_filename):
     y = sim.root.output.solution.unit_003.solution_outlet_comp_000
 
     x0, y0 = readChromatogram(ref_curve_filename)
+
+    # NOTE: Ensure that section times do not exceed available reference time
+    sim.root.input.solver.sections.section_times = [min(x0), max(x0)]
+
     sse_value = sse(x0,y0, x,y)
     global count
     count = count + 1
