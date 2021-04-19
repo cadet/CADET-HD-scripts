@@ -347,8 +347,10 @@ def main():
                     for line in minf:
                         if line.strip()[0] != '#':
                             minfdict.update({line.strip().split()[0].strip(): int(line.strip().split()[1])})
-                # mixdInfo(args['FILES'][0], len(arr), args['nrows'], args['ndf'])
-                mixdInfo(args['FILES'][0], len(arr), minfdict['nn'], args['ndf']) ## Usually used for data.all files
+                if(args['nrows']):
+                    mixdInfo(args['FILES'][0], len(arr), args['nrows'], args['ndf'])
+                else:
+                    mixdInfo(args['FILES'][0], len(arr), minfdict['nn'], args['ndf']) ## Usually used for data.all files
 
 
         # Write to BIN output file
