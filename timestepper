@@ -1,0 +1,32 @@
+#!/usr/bin/python3
+
+"""
+Generates timesteps based on a given dt/dtexp.
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+t = 0
+tend=1000
+count = 0
+
+times=[]
+steps=[]
+times.append(t)
+
+while t<tend:
+    dt = 0.2 + np.heaviside(t-10,1) * (t/20)
+    t = t + dt
+    times.append(t)
+    steps.append(dt)
+    count = count+1
+    print("{0}, {1:.2f}, {2:.2f}".format(count, dt, t))
+
+with plt.style.context(['science']):
+    fig,(ax1,ax2) = plt.subplots(1,2)
+    ax1.plot(times)
+    ax2.plot(steps)
+    plt.show()
+
+
