@@ -110,9 +110,10 @@ def run_command(cmdstring):
         return stdout
 
 
-def check_prerequisites():
+def check_prerequisites(programs=None):
     print("Checking Prerequisites...")
-    programs = ['gmsh2mixdv2', 'shiftmixd', 'scalemixd', 'rmmat', 'gennmat', 'decompose.metis', 'genmprd', 'dumpy']
+    if programs is None:
+        programs = ['gmsh2mixdv2', 'shiftmixd', 'scalemixd', 'rmmat', 'gennmat', 'decompose.metis', 'genmprd', 'dumpy']
     prgExists = [(shutil.which(prg) is not None) for prg in programs]
     if False in prgExists:
         print("\n".join("{}: {}".format(x,y) for x, y in zip(programs, prgExists)))
@@ -148,9 +149,11 @@ def setup_dirs():
     shutil.copy(TEMPLATEDIR.joinpath('mixd2xdmf.mass.in'), 'MASS'     )
     shutil.copy(TEMPLATEDIR.joinpath('job.mass.sh'      ), 'MASS'     )
 
-def edit_files():
+def edit_files(FILES:list):
     EDITOR = environ.get('EDITOR','vim')
-    subprocess.call([EDITOR, 'FLOW/xns.flow.in', 'MASS/xns.mass.in'])
+    cmdlist = [EDITOR]
+    cmdlist.extend(FILES)
+    subprocess.call(cmdlist)
 
 def set_stage():
     if environ.get('LMOD_DIR'):
@@ -194,7 +197,7 @@ def gen_spacetime_mesh(mshfile):
     nn_st = nn * 2
     sed_inplace('minf', 'nn', '# nn')
     run_command_in_shell('echo "nn     '+str(nn_st)+'" >> minf')
-    for mfile in ['mien', 'mxyz', 'mrng', 'minf', 'mtbl', 'mmat', 'mprd', 'mtbl.space', 'mxyz.space', 'mtbl.dual', 'minf.space']:
+    for mfile in ['mien', 'mxyz', 'mrng', 'minf', 'mtbl', 'mmat', 'mprd', 'mtbl.space', 'mxyz.space', 'mtbl.dual', 'minf.space', 'mprd.space']:
         try:
             shutil.move(mfile, 'MASS/mesh/' + mfile)
         except:
@@ -205,14 +208,16 @@ def remove_beads():
     root = Path.cwd()
     chdir('MASS/mesh/')
     run_command('rmmat -'+ ETYPE + '-st ../../FLOW/mesh 2')
+    chdir(root)
 
+    chdir('FLOW/mesh/')
     if 'xy' in config['periodic']:
         run_command('genmprd 0 0 x')
         run_command('genmprd 0 0 y -readmprd')
     if 'z' in config['periodic']:
         run_command('genmprd 0 0 z -readmprd')
-
     chdir(root)
+
 
     with Pool(processes=2) as pool:
         pool.apply_async(partition_flow)
@@ -505,12 +510,32 @@ def reprint(string):
     thread = current_process().name
     print(thread, ": " , string)
 
+def stitch(first:str, second:str, timesteps:str):
+    check_prerequisites(['stitchperiodic'])
+    print("Ensure that run directory contains inlet/outlet/column subdirs fully formed.")
+    root = Path.cwd()
+    chdir(first + '/FLOW/sim')
+    run_command('stitchperiodic data.out --ndf 4 --rng 2 --nts 2')
+    shutil.copy('rng.data', '../../../' + second + '/FLOW/sim/rng.data.in')
+    shutil.copy('rng.xyz', '../../../' + second + '/FLOW/sim/rng.xyz.in')
+    print("done with flow")
+    chdir('../../MASS/sim')
+    run_command('stitchperiodic data.all --ndf 2 --rng 2 --nts ' + timesteps + ' -s')
+    shutil.copy('rng.data', '../../../' + second + '/MASS/sim/rng.data.in')
+    shutil.copy('rng.xyz', '../../../' + second + '/MASS/sim/rng.xyz.in')
+    print("Ensure that xns.in files are properly written.")
+    chdir(root)
+    # edit_files([second + '/FLOW/sim/xns.in', second + '/MASS/sim/xns.in'])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-c", "--create-config", action='store_true', help="create an example config.json")
     ap.add_argument("-e", "--execute", help="execstring", choices=['rmmat', 'part', 'pf', 'pm', 'dec', 'df', 'dm', 'set', 'sub', 'edit'])
     ap.add_argument("-r", "--restart", help="restart chromatography simulation in current simulation directory. Provide name of new folder to store old data")
+    ap.add_argument("--stitch", nargs=3, help="stitch periodic sections of a column together")
     ap.add_argument("FILES", nargs='*', help="files")
+    ## TODO: unglobal this
     global args
     args = vars(ap.parse_args())
 
@@ -519,15 +544,13 @@ def main():
         print("Config file created")
         sys.exit(0)
 
-    # ## TODO: unglobal this
-    # global execstring
-    # execstring = args['execute']
-
     # check_prerequisites()
     set_stage()
 
     if args['restart']:
         restart(args['restart'])
+    elif args['stitch']:
+        stitch(args['stitch'][0], args['stitch'][1], args['stitch'][2])
     else:
         ## serial execution
         for mshfile in args['FILES']:
