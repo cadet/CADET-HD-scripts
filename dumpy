@@ -27,6 +27,29 @@ import sys
 import itertools
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
+
+def find_up(name, startdir='.', stopdir='~', multiple=False, norecurse=False, nobreak=False):
+    path = Path(startdir).resolve()                   ## start searching in startdir
+    stop = Path(stopdir).expanduser().parent.resolve()   ## search in the stopdir, but not beyond. stopdir is inclusive
+    # print('Searching recursively until', Path(stopdir).expanduser() )
+    res_nobreak = []
+    res=[]
+    while path != stop:
+        if norecurse:
+            res = [ x for x in path.glob(name) ]
+        else:
+            res = [ x for x in path.rglob(name) ]
+        if nobreak:
+            res_nobreak.extend(res)
+        else:
+            if res:
+                if multiple:
+                    return res
+                else:
+                    return [res[0]]
+        path = path.parent
+    return list(set(res_nobreak))
 
 def bin_to_arr(filename, dataformat, skip=0, skiprows=0, nrows=0, ncols=0):
     datasize = dataformatsize(dataformat)
@@ -317,7 +340,15 @@ def main():
                 print('Type:', type(arr[0]))
                 print('Serial Length:', len(arr))
                 print('Proper Length:', len(arr) / ndf)
-                mixdInfo(args['FILES'][0], len(arr), args['nrows'], args['ndf'])
+                ## TODO: Can separate this out and fully automate this for all --mixd files
+                minffile = find_up("minf")
+                minfdict = {}
+                with open(minffile[0], 'r') as minf:
+                    for line in minf:
+                        if line.strip()[0] != '#':
+                            minfdict.update({line.strip().split()[0].strip(): int(line.strip().split()[1])})
+                # mixdInfo(args['FILES'][0], len(arr), args['nrows'], args['ndf'])
+                mixdInfo(args['FILES'][0], len(arr), minfdict['nn'], args['ndf']) ## Usually used for data.all files
 
 
         # Write to BIN output file
