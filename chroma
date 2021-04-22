@@ -240,15 +240,9 @@ def decompose_flow():
     root = Path.cwd()
     chdir('FLOW/mesh/')
 
-    # if config['decompose'] == 'yes':
-    #     if config['decompose-mpi'] == 'yes':
-    #         run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e '+ ETYPE + '-w -p ' + config['job-cpus'])
-    #     elif config['decompose-backend'] == 'yes':
-    #         run_command('srun -N ' + config['decompose-N'] + ' -n' + config['decompose-np'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-part'] + ' decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
-    #     else:
-    #         run_command('decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
-    # else:
-    #     reprint("Not decomposing mesh")
+    if config['decompose'] != 'no':
+        if environ.get('LMOD_DIR'):
+            module('load GCC/9.3.0 ParaStationMPI/5.4.7-1 ParMETIS/4.0.3-double Boost')
 
     if config['decompose'] == 'no':
         reprint("Not decomposing mesh")
@@ -257,8 +251,6 @@ def decompose_flow():
     elif config['decompose'] == 'mpi':
         run_command('mpiexec -np ' + config['decompose-nprocs'] + ' decompose.metis -e '+ ETYPE + '-w -p ' + config['job-cpus'])
     elif config['decompose'] == 'backend':
-        if environ.get('LMOD_DIR'):
-            module('load GCC/9.3.0 ParaStationMPI/5.4.7-1 ParMETIS/4.0.3-double Boost')
         run_command('srun -N ' + config['decompose-nnodes'] + ' -n' + config['decompose-nprocs'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-backend'] + ' decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
 
     chdir(root)
@@ -281,15 +273,9 @@ def decompose_mass():
     root = Path.cwd()
     chdir('MASS/mesh/')
 
-    # if config['decompose'] == 'yes':
-    #     if config['decompose-mpi'] == 'yes':
-    #         run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
-    #     elif config['decompose-backend'] == 'yes':
-    #         run_command('srun -N ' + config['decompose-N'] + ' -n' + config['decompose-np'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-part'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
-    #     else:
-    #         run_command('decompose.metis -e '+ ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
-    # else:
-    #     reprint("Not decomposing mesh")
+    if config['decompose'] != 'no':
+        if environ.get('LMOD_DIR'):
+            module('load GCC/9.3.0 ParaStationMPI/5.4.7-1 ParMETIS/4.0.3-double Boost')
 
     if config['decompose'] == 'no':
         reprint("Not decomposing MASS mesh")
@@ -298,8 +284,6 @@ def decompose_mass():
     elif config['decompose'] == 'mpi':
         run_command('mpiexec -np ' + config['decompose-nprocs'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
     elif config['decompose'] == 'backend':
-        if environ.get('LMOD_DIR'):
-            module('load GCC/9.3.0 ParaStationMPI/5.4.7-1 ParMETIS/4.0.3-double Boost')
         run_command('srun -N ' + config['decompose-nnodes'] + ' -n' + config['decompose-nprocs'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-backend'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
 
     ## TODO: check that this is proper
