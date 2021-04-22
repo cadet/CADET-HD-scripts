@@ -28,7 +28,7 @@ import argparse
 import subprocess
 
 from pathlib import Path
-from os import environ, chdir
+from os import environ, chdir, stat
 from tempfile import NamedTemporaryFile
 from multiprocessing import Pool, current_process
 
@@ -502,11 +502,14 @@ def stitch(first:str, second:str, timesteps:str):
     run_command('stitchperiodic data.out --ndf 4 --rng 2 --nts 2')
     shutil.copy('rng.data', '../../../' + second + '/FLOW/sim/rng.data.in')
     shutil.copy('rng.xyz', '../../../' + second + '/FLOW/sim/rng.xyz.in')
-    print("done with flow")
+    flowstat = stat('rng.xyz')
+    print("Done with flow. nn_rng:", flowstat.st_size/(3*8))
     chdir('../../MASS/sim')
     run_command('stitchperiodic data.all --ndf 2 --rng 2 --nts ' + timesteps + ' -s')
     shutil.copy('rng.data', '../../../' + second + '/MASS/sim/rng.data.in')
     shutil.copy('rng.xyz', '../../../' + second + '/MASS/sim/rng.xyz.in')
+    massstat = stat('rng.xyz')
+    print("Done with mass. nn_rng:", massstat.st_size/(3*8))
     print("Ensure that xns.in files are properly written.")
     chdir(root)
     # edit_files([second + '/FLOW/sim/xns.in', second + '/MASS/sim/xns.in'])
