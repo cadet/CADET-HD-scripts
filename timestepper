@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 t = 0
-tend=1000
+tend=500
 count = 0
 
 times=[]
@@ -16,7 +16,8 @@ steps=[]
 times.append(t)
 
 while t<tend:
-    dt = 0.2 + np.heaviside(t-10,1) * (t/20)
+    dt = 5 + np.heaviside(t-100,1) * (t/10 - 10)
+    # dt = 5 + np.heaviside(t-100,1) * (45) + np.heaviside(t-500,1) * (t/20)
     t = t + dt
     times.append(t)
     steps.append(dt)
@@ -28,5 +29,3 @@ with plt.style.context(['science']):
     ax1.plot(times)
     ax2.plot(steps)
     plt.show()
-
-

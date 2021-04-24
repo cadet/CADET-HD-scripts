@@ -135,6 +135,14 @@ def read_config():
         NEN = "10 "
         ETYPE = "tetP2 "
 
+    if args['decompose']:
+        config['decompose'] = args['decompose']
+    if args['nparts']:
+        config['job-cpus'] = args['nparts'] ## TODO: consider renaming job-cpus and other job- tags?
+    if args['periodic']:
+        config['periodic'] = args['periodic']
+
+
 
 def setup_dirs():
     reprint("Creating FLOW directory...")
@@ -351,7 +359,6 @@ def submit_sims():
 
 
 def create_config():
-
     config["mesh-order"] = "1"
     config["mesh-dim"] = "3"
     config["transform"] = "no"
@@ -359,7 +366,7 @@ def create_config():
     config["scale"] = ""
     config["periodic"] = "no"
     config["job-name"] = "DIR"
-    config["job-cpus"] = "512"
+    config["job-cpus"] = "0"
     config["job-acct"] = "jibg12"
     config["job-part"] = "batch"
     config["job-flowtime"] = "02:00:00"
@@ -494,7 +501,7 @@ def reprint(string):
     thread = current_process().name
     print(thread, ": " , string)
 
-def stitch(first:str, second:str, timesteps:str):
+def stitch(first:str, second:str):
     check_prerequisites(['stitchperiodic'])
     print("Ensure that run directory contains inlet/outlet/column subdirs fully formed.")
     root = Path.cwd()
@@ -504,8 +511,11 @@ def stitch(first:str, second:str, timesteps:str):
     shutil.copy('rng.xyz', '../../../' + second + '/FLOW/sim/rng.xyz.in')
     flowstat = stat('rng.xyz')
     print("Done with flow. nn_rng:", flowstat.st_size/(3*8))
+
     chdir('../../MASS/sim')
-    run_command('stitchperiodic data.all --ndf 2 --rng 2 --nts ' + timesteps + ' -s')
+    nn = stat('../mesh/mxyz').st_size/(3*8)
+    nts = stat('data.all').st_size/(2*nn*8) # ndf = 2, timesteps to stitch are calculated
+    run_command('stitchperiodic data.all --ndf 2 --rng 2 --nts ' + str(nts) + ' -s')
     shutil.copy('rng.data', '../../../' + second + '/MASS/sim/rng.data.in')
     shutil.copy('rng.xyz', '../../../' + second + '/MASS/sim/rng.xyz.in')
     massstat = stat('rng.xyz')
@@ -520,8 +530,15 @@ def main():
     ap.add_argument("-c", "--create-config", action='store_true', help="create an example config.json")
     ap.add_argument("-e", "--execute", help="execstring", choices=['rmmat', 'part', 'pf', 'pm', 'dec', 'df', 'dm', 'set', 'sub', 'edit'])
     ap.add_argument("-r", "--restart", help="restart chromatography simulation in current simulation directory. Provide name of new folder to store old data")
-    ap.add_argument("--stitch", nargs=3, help="stitch periodic sections of a column together")
+    ap.add_argument("--stitch", nargs=2, help="stitch periodic sections of a column together")
     ap.add_argument("FILES", nargs='*', help="files")
+
+    ##TODO: Commandline args for config overrrides
+    ap.add_argument("-np", "--nparts", help="Number of decompose parts and job processes.")
+    ap.add_argument("--decompose", type=str, choices=["no", "yes", "mpi", "backend"], help="Override config and force decompose.")
+    ap.add_argument("--periodic", type=str, choices=["no", "xy", "xyz"], help="Override config and force periodic.")
+
+
     ## TODO: unglobal this
     global args
     args = vars(ap.parse_args())
@@ -529,7 +546,8 @@ def main():
     if args['create_config']:
         create_config()
         print("Config file created")
-        sys.exit(0)
+        # sys.exit(0)
+
 
     # check_prerequisites()
     set_stage()
@@ -537,7 +555,7 @@ def main():
     if args['restart']:
         restart(args['restart'])
     elif args['stitch']:
-        stitch(args['stitch'][0], args['stitch'][1], args['stitch'][2])
+        stitch(args['stitch'][0], args['stitch'][1])
     else:
         ## serial execution
         for mshfile in args['FILES']:
