@@ -15,6 +15,8 @@
 ##                  ...
 
 
+NEN=4
+NSD=3
 
 ## mixd double records. Find nn from mxyz, using: mdrec <mxyz> <nsd>
 get_mixd_double_nrec(){
@@ -27,6 +29,12 @@ get_mixd_int_nrec(){
     echo $(( $(stat --printf="%s" $1) / ( ${2:-1} * 4 ) ))
 }
 
+get_nts(){
+    NN=$(get_mixd_double_nrec ../mesh/mxyz $NSD)
+    NTS=$(get_mixd_double_nrec $1 $(( 2*NN )) )
+    echo $NTS
+}
+
 mapflow_wrapper(){
     # usage: mapflow sim
     cd ../mesh
@@ -34,11 +42,6 @@ mapflow_wrapper(){
     cd ../sim
     cp ../mesh/flowfield .
 }
-
-NEN=4
-NSD=3
-NN=$(get_mixd_double_nrec ../mesh/mxyz $NSD)
-NE=$(get_mixd_int_nrec ../mesh/mien $NEN)
 
 stitch_flow(){
     ## Usage: stitch_flow <column> <sim-dirname>
@@ -58,7 +61,7 @@ stitch_mass(){
     ## Usage: stitch_mass inlet sim
     ROOT=${PWD}
     cd ../../../$1/MASS/$2
-    NTS=$(get_mixd_double_nrec data.all $(( 2*NN )) )
+    NTS=$(get_nts data.all)
     stitchperiodic data.all -r 2 -t $NTS -n 2 -s
     cd $ROOT
     cp ../../../$1/MASS/$2/rng.data rng.data.in
