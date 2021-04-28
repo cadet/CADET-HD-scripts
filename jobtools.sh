@@ -37,9 +37,10 @@ get_nts(){
 
 mapflow_wrapper(){
     # usage: mapflow sim
+    CWD=${PWD}
     cd ../mesh
     mapflow -tet ../../FLOW/mesh ../../FLOW/$1
-    cd ../sim
+    cd "$CWD"
     cp ../mesh/flowfield .
 }
 
