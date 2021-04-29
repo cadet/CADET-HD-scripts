@@ -1,0 +1,158 @@
+#!/usr/bin/bash
+
+## Script to slice any file in arbitrary ways
+## Helpful with data.all slicing
+## It's just a wrapper script around `dd`
+## Explore `dd` for an even more powerful way to handle files
+
+## If -nn is not provided, it first tries to extract it from ../mesh/mxyz, then ../mesh/minf 
+## Default settings are for 3D tetrahedral double data. No default ndf.
+
+## -s/--skip N to skip N chunks of input; default 0
+## -c/--count N to extract N chunks of input; default unset => till end of input file
+
+## Examples: to skip one record and append (useful to combine restarted data.all files)
+##      mslice -ndf <ndf> -nn <nn> -s 1 -i <inputfile> -o <outputfile> -a
+
+set -e
+
+INPUT=
+OUTPUT=
+NDF=
+NN=
+COUNT=
+MXYZ="../mesh/mxyz"
+MINF="../mesh/minf"
+SKIP=0
+NEN=4
+NSD=3
+VARSIZE=8
+FLAGS=
+
+declare -a OFLAGS=()
+declare -a CONVS=()
+
+die(){
+    echo "$@"
+    exit
+}
+
+## mixd double records. Find nn from mxyz, using: mdrec <mxyz> <nsd>
+get_mixd_double_nrec(){
+        echo $(( $(stat --printf="%s" $1) / ( ${2:-1} * 8 ) ))
+}
+
+
+POSITIONAL=()
+while [[ $# -gt 0 ]]
+do
+    key="$1"
+    case $key in
+        -i|--input)
+            INPUT=$2
+            shift # past value
+            shift # past value
+            ;;
+        -o|--output)
+            OUTPUT=$2
+            shift # past value
+            shift # past value
+            ;;
+        -s|--skip)
+            SKIP=$2
+            shift # past value
+            shift # past value
+            ;;
+        -tet|--tet)
+            NEN=4
+            NSD=3
+            shift # past value
+            ;;
+        -tri|--tri)
+            NEN=3
+            NSD=2
+            shift # past value
+            ;;
+        -nn|--nn)
+            NN=$2
+            shift # past value
+            shift # past value
+            ;;
+        -ndf|--ndf)
+            NDF=$2
+            shift # past value
+            shift # past value
+            ;;
+        -c|--count)
+            COUNT=$2
+            shift # past value
+            shift # past value
+            ;;
+        -mxyz|--mxyz)
+            MXYZ=$2
+            shift # past value
+            shift # past value
+            ;;
+        -minf|--minf)
+            MINF=$2
+            shift # past value
+            shift # past value
+            ;;
+        -a|--append)
+            OFLAGS+=(append)
+            CONVS+=(notrunc)
+            shift # past value
+            ;;
+        -v|--varsize)
+            VARSIZE=$2
+            shift # past value
+            shift # past value
+            ;;
+        *)    # unknown option
+            POSITIONAL+=("$1") # save it in an array for later
+            shift # past argument
+            ;;
+    esac
+done
+set -- "${POSITIONAL[@]}" # restore positional parameters
+
+if [[ -f "$MXYZ" ]]; then
+    echo "Assuming nsd: $NSD to extract nn from $2..."
+    NN=$(get_mixd_double_nrec $2 $NSD)
+    [ -n $NN ] && echo "Found nn: $NN" || die "Error finding nn from mxyz."
+elif [[ -f "$MINF" ]]; then
+    echo "Extracting nn from minf..."
+    NN=$(grep 'nn' $2 | awk '{print $2}')
+    [ -n $NN ] && echo "Found nn: $NN" || die "Error finding nn from minf."
+fi
+
+[ -z "$NDF" ] && die "No ndf given"
+[ -z "$NN" ] && die "No nn given or found"
+
+
+[ -z "$INPUT" ] && die "No input file provided!"
+[ -f "$INPUT" ] || die "Input file doesn't exist!"
+[ -z "$OUTPUT" ] && die "No output file provided!"
+
+CHUNKSIZE=$(( $NN*$NDF*$VARSIZE ))
+printf -v CONVS_JOINED '%s,' "${CONVS[@]}"
+printf -v OFLAGS_JOINED '%s,' "${OFLAGS[@]}"
+
+[ -n "$CONVS" ] && OUTFLAGS="conv=${CONVS_JOINED%,} oflag=${OFLAGS%,}"
+[ -n "$COUNT" ] && COUNTFLAG="count=$COUNT"
+
+echo "nn: $NN"
+echo "ndf: $NDF"
+echo "nsd: $NSD"
+echo "skip: $SKIP records"
+echo "count: $COUNT records"
+echo "varsize: $VARSIZE bytes"
+echo "chunksize: $CHUNKSIZE bytes"
+echo "conv: ${CONVS_JOINED%,}"
+echo "oflag: ${OFLAGS_JOINED%,}"
+echo "input file: $INPUT"
+echo "output file: $OUTPUT"
+# echo "countflag: $COUNTFLAG"
+# echo "outflags: $OUTFLAGS"
+
+dd bs=$CHUNKSIZE if=$INPUT of=$OUTPUT skip=$SKIP $COUNTFLAG $OUTFLAGS

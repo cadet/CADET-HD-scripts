@@ -17,7 +17,8 @@ Alternatives: od (octaldump) to convert from bin->ascii
     $ od -A n -t fD --endian=big -w24 mxyz
 """
 
-# TODO: Test extract_slice on large files (will there be overflows?)
+## TODO: Test extract_slice on large files (will there be overflows?)
+## TODO: Print nth column
 
 from __future__ import print_function
 
@@ -217,6 +218,8 @@ def main():
     ap.add_argument("--extract-slice", help="Quick write out to file without storing full data in RAM.")
     ap.add_argument("--bufsize", help="Read/write buffer size for --extract-slice. Default = nrows * ncols * datasize (the length of 1 step of the input data)", type=int)
 
+    ap.add_argument("--print-col", type=int, help="print nth column. 0-indexed.")
+
     ap.add_argument("--dpacking", action='store_true', help="Input file is packing.xyzd with e=< and n=4 v=d.")
     ap.add_argument("--fpacking", action='store_true', help="Input file is packing.xyzd with e=< and n=4 v=f.")
     ap.add_argument("--nfo", help="Read newly generated packing data and calculate final scaling factor from NFO file.")
@@ -317,6 +320,8 @@ def main():
         if args['double']:
             array = array + array
 
+
+
         if args['fill']:
             if(vartype == 'i'):
                 dummy = [ int(args['fill'][0]) ]
@@ -330,10 +335,16 @@ def main():
         out_arrays = []
         out_arrays = np.array_split(np.array(array), args['split'])
 
+        if args['print_col']:
+            for arr in out_arrays:
+                print_data(np.reshape(arr, (len(arr)//ndf,ndf))[:,args['print_col']], 1, vartype)
+
         # Output to STDOUT
         if args['print']:
             for arr in out_arrays:
                 print_data(arr, ndf, vartype)
+
+
 
         if args['info']:
             for arr in out_arrays:

@@ -23,10 +23,12 @@ Algorithm:
 
 from PIL import Image
 from PIL import ImageEnhance
+from PIL import ImageFilter
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 import csv
+import sys
 
 # enhanceFactor = 1.5 ## Factor by which to enhance image contrast
 # threshold     = 180 ## Brightness threshold to consider as beads/pores
@@ -52,6 +54,14 @@ arr = np.array(im)
 enh = ImageEnhance.Contrast(im)
 ime = enh.enhance(enhanceFactor) # enhance contrast
 # ime.show("ENHANCED")
+# sys.exit()
+
+# imb = ime.filter(ImageFilter.BLUR)
+# imb2 = ime.filter(ImageFilter.MinFilter(3))
+# imb3 = ime.filter(ImageFilter.MinFilter)
+# imfe = ime.filter()
+# imfe.show('blur', 'eog')
+# sys.exit()
 
 arr = np.array(ime)
 x = np.arange(0, arr.shape[1])
@@ -85,7 +95,7 @@ print("Centers:", xc, yc)
 
 ##Visual debug
 ## arr = np.zeros((arr.shape[0], arr.shape[1]))
-#r = rad/2
+#r = rad
 #mask = np.logical_and( (x[np.newaxis,:]-xc)**2 + (y[:,np.newaxis]-yc)**2 <= (r+half_width)**2, (x[np.newaxis,:]-xc)**2 + (y[:,np.newaxis]-yc)**2 >= (r-half_width)**2)
 ## arr[mask] = 255
 #arr[mask] = 0
