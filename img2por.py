@@ -23,12 +23,20 @@ Algorithm:
 
 from PIL import Image
 from PIL import ImageEnhance
-from PIL import ImageFilter
+# from PIL import ImageFilter
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 import csv
 import sys
+from random import seed, randint
+
+def colorplot(x, y, arr, filename):
+    fig = plt.figure()
+    plt.pcolormesh(x, y, arr, shading='auto')
+    plt.colorbar()
+    plt.show()
+    fig.savefig(filename)
 
 # enhanceFactor = 1.5 ## Factor by which to enhance image contrast
 # threshold     = 180 ## Brightness threshold to consider as beads/pores
@@ -46,34 +54,29 @@ threshold     = args['threshold'] ## Brightness threshold to consider as beads/p
 half_width    = args['width']     ## Half ring-width to count pixels at a given radius
 
 im = Image.open(args['FILE'])
+# im.show()
+
 print(im.format, im.size, im.mode)
-
 arr = np.array(im)
-# print(arr.shape)
 
+
+## Enhance contrast
 enh = ImageEnhance.Contrast(im)
 ime = enh.enhance(enhanceFactor) # enhance contrast
-# ime.show("ENHANCED")
-# sys.exit()
-
-# imb = ime.filter(ImageFilter.BLUR)
-# imb2 = ime.filter(ImageFilter.MinFilter(3))
-# imb3 = ime.filter(ImageFilter.MinFilter)
-# imfe = ime.filter()
-# imfe.show('blur', 'eog')
-# sys.exit()
-
 arr = np.array(ime)
+
 x = np.arange(0, arr.shape[1])
 y = np.arange(0, arr.shape[0])
 xmax, ymax = arr.shape
-# print(arr.shape)
+print(arr.shape)
 # print(arr[0][0])
 
+print ("Enhanced: max={max}, min={min}".format(max=np.max(arr), min=np.min(arr)))
+
+colorplot(x,y,arr,"image.png")
 
 ## Find limits and center of the column.
 yw,xw = np.where(arr >= threshold) ## Find bright pixels -> beads
-# print(xw.shape, yw.shape)
 
 xmin = min(xw)
 xmax = max(xw)
@@ -97,17 +100,18 @@ print("Centers:", xc, yc)
 ## arr = np.zeros((arr.shape[0], arr.shape[1]))
 #r = rad
 #mask = np.logical_and( (x[np.newaxis,:]-xc)**2 + (y[:,np.newaxis]-yc)**2 <= (r+half_width)**2, (x[np.newaxis,:]-xc)**2 + (y[:,np.newaxis]-yc)**2 >= (r-half_width)**2)
-## arr[mask] = 255
-#arr[mask] = 0
-#fig = plt.figure()
-#plt.pcolormesh(x, y, arr)
-#plt.colorbar()
-#plt.show()
-#fig.savefig("microct-image-400_sample_ring.png")
+#arr[mask] = 3
+## arr[mask] = 1
+#colorplot(x,y,arr,"microct-sample-ring.png")
+#sys.exit()
+
+
 
 ## Output lists
 out_rad = []
 out_por = []
+
+zarr = np.zeros((arr.shape[0], arr.shape[1]))
 
 for r in range(half_width,rad-half_width,2*half_width):
     # print(r-half_width, r, r+half_width)
@@ -116,17 +120,31 @@ for r in range(half_width,rad-half_width,2*half_width):
     mask = np.logical_and( (x[np.newaxis,:]-xc)**2 + (y[:,np.newaxis]-yc)**2 <= (r+half_width)**2, (x[np.newaxis,:]-xc)**2 + (y[:,np.newaxis]-yc)**2 >= (r-half_width)**2)
 
     total = arr[mask].size ## Count number of pixels in given ring
-    pores = np.where(arr[mask] <= threshold)[0].size ## count number of dark pixels -> voids
+    pores = np.where(arr[mask] < threshold)[0].size ## count number of dark pixels -> voids
+    # print(pores, total)
+
+    # ## To check if I'm double sampling any pixels
+    # ## Turns out, yes, but very few to actually matter
+    # zarr[mask] = zarr[mask] + 1
 
     out_rad.append(r)
     out_por.append(pores/total)
 
 fig = plt.figure()
-plt.plot(out_rad, out_por)
+plt.plot(out_rad, out_por,linewidth=2)
+plt.xlabel("Radial distance")
+plt.ylabel("Porosity")
 plt.show()
-# fig.savefig("image_rad_por.png")
+fig.savefig("image_rad_por.png")
+
+## Full disk mask
+# fulldiskmask = ((x[np.newaxis,:]-xc)**2 + (y[:,np.newaxis]-yc)**2 <= (rad)**2 )
+# zarr[fulldiskmask] = 1
+# colorplot(x,y,zarr, "disk.png")
+# total = arr[fulldiskmask].size ## Count number of pixels in given ring
+# pores = np.where(arr[fulldiskmask] < threshold)[0].size ## count number of dark pixels -> voids
+# print("Average porosity of current slice: {avg}".format(avg=pores/total))
 
 with open(args['FILE']+'_rad_por.csv', 'w') as f:
     writer = csv.writer(f, delimiter=',')
     writer.writerows(zip(out_rad, out_por))
-

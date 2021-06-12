@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 t = 0
-tend=500
+tend=12000
 count = 0
 
 times=[]
@@ -16,7 +16,7 @@ steps=[]
 times.append(t)
 
 while t<tend:
-    dt = 5 + np.heaviside(t-100,1) * (t/10 - 10)
+    dt = 1 + np.heaviside(t-100,1) * (t/20 - 5)
     # dt = 5 + np.heaviside(t-100,1) * (45) + np.heaviside(t-500,1) * (t/20)
     t = t + dt
     times.append(t)
@@ -25,7 +25,11 @@ while t<tend:
     print("{0}, {1:.2f}, {2:.2f}".format(count, dt, t))
 
 with plt.style.context(['science']):
-    fig,(ax1,ax2) = plt.subplots(1,2)
+    fig,(ax1,ax2,ax3) = plt.subplots(1,3)
     ax1.plot(times)
+    ax1.set(title="Time")
     ax2.plot(steps)
+    ax2.set(title="Timesteps")
+    ax3.scatter(times, [0]*len(times))
+    ax3.set(title="Time scatter")
     plt.show()

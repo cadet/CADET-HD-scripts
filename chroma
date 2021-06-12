@@ -548,7 +548,6 @@ def main():
         print("Config file created")
         # sys.exit(0)
 
-
     # check_prerequisites()
     set_stage()
 

@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+
+import yaml
+import argparse
+import numpy as np
+
+# from ruamel.yaml import YAML
+# import sys
+
+from cadet import Cadet
+from addict import Dict
+
+ap = argparse.ArgumentParser(description='Convert yaml to hdf5')
+ap.add_argument("-o", "--output", help="Output hdf5 filename")
+ap.add_argument("-r", "--reverse", action='store_true', help="Convert hdf5 to yaml")
+ap.add_argument("-u", "--update", action='store_true', help="Update existing h5 file")
+ap.add_argument("-p", "--print", action='store_true', help="Print to stdout")
+ap.add_argument("files", nargs='*', help="Input files. Will be applied in order")
+args = vars(ap.parse_args())
+
+# TODO: Option to overwrite or append h5
+
+def reconstruct(dic:dict):
+    """
+    Convert from addict dict filled with numpy types to
+    dict filled with python native types
+    """
+    cleandict = {}
+    for key in dic.keys():
+        if isinstance(dic[key], Dict):
+            value = reconstruct(dic[key])
+            cleandict.update({key: value})
+        else:
+            value = np2native(dic[key])
+            cleandict.update({key: value})
+    return cleandict
+
+def np2native(obj):
+    """
+    Convert from numpy types to python native types
+    """
+    if isinstance(obj, np.bytes_):
+        return obj.tobytes().decode('utf-8')
+    elif isinstance(obj, np.generic) or isinstance(obj,np.ndarray):
+        return obj.tolist()
+    else:
+        return obj
+
+
+if args['reverse']:
+    ## HDF5 to YAML
+    config = {}
+    for fname in args['files']:
+        sim = Cadet()
+        sim.filename = fname
+        sim.load()
+        config.update(reconstruct(sim.root))
+
+    if args['print']:
+        print(yaml.dump(config, allow_unicode=True, default_flow_style=False))
+
+    if args['output']:
+        with open(args['output'], 'w') as outfile:
+                yaml.dump(config, outfile)
+else:
+    ## YAML to HDF5
+    ## Write to clean file
+    config = {}
+    for fname in args['files']:
+        with open(fname, 'r') as inputfile:
+            config.update(yaml.load(inputfile, Loader=yaml.FullLoader))
+
+    sim = Cadet()
+
+    if args['print']:
+        print(yaml.dump(config, allow_unicode=True, default_flow_style=False))
+
+    if args['update'] and args['output']:
+        sim.filename = args['output']
+        sim.load()
+        sim.root.update(Dict(config))
+        sim.save()
+    elif args['output']:
+        sim.filename = args['output']
+        sim.root = Dict(config)
+        sim.save()

@@ -210,6 +210,8 @@ def main():
     ap.add_argument("-z", "--zero-pad", action='store_true', help="Pre-pad file with zeroes")
     ap.add_argument("-d", "--double", action='store_true', help="Double the file. Useful for converting semi-discrete to space-time data, although cat is better.")
     ap.add_argument("-f", "--fill", nargs=2, default = [0, 0], help="Fill the given file with values")
+    ap.add_argument("-c", "--compare", help="Compare input files with this reference file.")
+    ap.add_argument("-t", "--tolerance", type=float, default=1e-6, help="Tolerance for comparison. Default=1e-6")
 
     # TODO:
     ap.add_argument("--skip", type=int, default=0, help="Skip <n> steps of the BINARY input file") ## n * rows * cols
@@ -252,6 +254,10 @@ def main():
     dataformat = endianness + vartype
     # datasize = 0
 
+    refarray=[]
+    if args['compare']:
+        refarray = bin_to_arr(args['compare'], dataformat, skip=args['skip'], skiprows=args['skiprows'], nrows=args['nrows'], ncols=args['ndf'])
+
 
 
     scale_offset= args['scale_offset']
@@ -289,6 +295,17 @@ def main():
             array = ascii_to_arr(infile, vartype)
         else:
             array = bin_to_arr(infile, dataformat, skip=args['skip'], skiprows=args['skiprows'], nrows=args['nrows'], ncols=args['ndf'])
+
+        if args['compare']:
+            result = map(lambda x,y:abs(x-y)<args['tolerance'], array, refarray)
+            reslist = list(result)
+            if all(reslist):
+                print("Similar!")
+                sys.exit(0)
+            else:
+                print("Different!")
+                print([i for i,x in enumerate(reslist) if not x])
+                sys.exit(-1)
 
         ## TODO: Clean this up
         ## Apply scale_factor to every ndf'th number

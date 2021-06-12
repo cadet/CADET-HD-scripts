@@ -65,10 +65,17 @@ function load_modules()
             module load Intel IntelMPI imkl CMake flex Boost
         fi
 
-        export CC=mpiicc
-        export FC=mpiifort
-        export CXX=mpiicpc
         export FLAGS_FAST='-O3'
+
+        if [[ "$mpi" == "ON" ]]; then
+            export CC=mpiicc
+            export FC=mpiifort
+            export CXX=mpiicpc
+        else
+            export CC=icc
+            export FC=ifort
+            export CXX=icpc
+        fi
 
     elif [[ "$compiler" == "gnu" ]]; then
         echo "setting up for GNU compiler (LOCAL)"
@@ -78,16 +85,45 @@ function load_modules()
         # export FLAGS_FAST='-O3'
         export FLAGS_FAST='-O3 -ffast-math -mtune=native'
 
-        export CC=mpicc
-        export FC=mpifort
-        export CXX=mpicxx
+        if [[ "$mpi" == "ON" ]]; then
+            export CC=mpicc
+            export FC=mpifort
+            export CXX=mpicxx
+        else
+            export CC=gcc
+            export FC=gfortran
+            export CXX=g++
+        fi
     fi
 
+}
+
+function pull_rebase()
+{
+    pkgdir="$1"
+    main="$2"
+    # branch=$(git rev-parse --abbrev-ref HEAD)
+    cd "$basedir/$pkgdir"
+    branch=$(git branch --show-current)
+    git checkout $main
+    git pull
+    git checkout $branch
+    git rebase $main
+    cd "$basedir"
+}
+
+function pull_latest_all()
+{
+    pull_rebase "$ewddir" "develop"
+    pull_rebase "$mathlibdir" "master"
+    pull_rebase "$sparskitdir" "master"
+    pull_rebase "$xnsdir" "develop"
 }
 
 buildtype="Debug"
 installprefix="$HOME/local/simulation/"
 extraargs=""
+mpi="ON"
 compiler="gnu"
 build_deps="ON"
 clean="OFF"
@@ -123,6 +159,7 @@ do
             ;;
         --no-mpi)
             extraargs="$extraargs"" -DMPI=OFF"
+            mpi="OFF"
             shift # past value
             ;;
         -a|--args)
@@ -134,6 +171,10 @@ do
             installprefix="$2"
             shift # past value
             shift # past value
+            ;;
+        --pull)
+            pull_latest_all
+            shift
             ;;
         -x|--xns)
             build_deps="OFF"
@@ -153,4 +194,3 @@ load_modules
 [ "$build_deps" = "ON" ] && builder "$mathlibdir" "$extraargs"
 [ "$build_deps" = "ON" ] && builder "$sparskitdir" "$extraargs"
 builder "$xnsdir" "$extraargs"
-

@@ -2,7 +2,7 @@
 
 ## https://www.paraview.org/Wiki/ParaView_and_Python#Control_the_camera
 
-"""
+""" vis.py
 A Paraview script to aid the postprocessing of data. I wrote it mainly to generate images out of output files.
 
 Usage by examples:
@@ -21,15 +21,7 @@ Usage notes:
 
 """
 
-## DONE: automate reader type
-## DONE: distribute to parallel
-## DONE: Fix flow animate problem
-## DONE: Allow screenshotting ALL scalars in one run
-## DONE: Parametrize view size geometry
 ## TODO: config.json file
-## TODO: Parametrize background color
-## DONE: rotated views [Good for image resolution in long columns]
-## DONE: After updatescalarbars() they are always visible even with -nsb
 ## TODO: Allow modularity/composability of functions in operating modes
 ## TODO: Automatic filetype detection
 ## TODO: Easy way to select "Solid Color"
@@ -41,6 +33,7 @@ Usage notes:
 
 import argparse
 from matplotlib import pyplot as plt
+# from paraview.simple import * #type:ignore
 from paraview.simple import *
 paraview.simple._DisableFirstRenderCameraReset()
 from vtkmodules.numpy_interface import dataset_adapter as dsa
@@ -55,8 +48,6 @@ import os
 
 # import h5py ##NOTE: Is perhaps better as a standard format, but issue with the version of paraview compiled locally at time of scripting. So working with bin files.
 
-def MIXDReader():
-    pass
 
 def appendToBin(arr, filename, f):
     with(open(filename, 'ab')) as output:
@@ -102,13 +93,11 @@ def bead_loading(reader, args):
     print("nts:", nts)
     print("ncv:", ncv)
 
-    renderView1 = GetActiveViewOrCreate('RenderView')
-    # display = Show(reader, renderView1)
-    # Hide(reader, renderView1)
+    view = GetActiveViewOrCreate('RenderView')
 
     connectivity = Connectivity(Input=reader)
-    connectivityDisplay = Show(connectivity, renderView1)
-    Hide(connectivity, renderView1)
+    connectivityDisplay = Show(connectivity, view)
+    Hide(connectivity, view)
 
     # NOTE: Threshold  range will be (0, n) where n is number of beads.
     # Typically, the interstitial domain is the last, n+1th region.
@@ -130,7 +119,7 @@ def bead_loading(reader, args):
             print("Processing timestep: {timestep:3d} | bead: {index:5d} | file: {file}".format(timestep=timestep, index=index, file=files[timestep]), end="\r")
             threshold = Threshold(Input=connectivity)
             threshold.ThresholdRange = [index, index]
-            thresholdDisplay = Show(threshold, renderView1)
+            thresholdDisplay = Show(threshold, view)
             # threshold.UpdatePipeline()
 
             if timestep == 0:
@@ -155,7 +144,7 @@ def bead_loading(reader, args):
                 values.append(value[0])
 
             dataArr[timestep,index,:] = np.array(values)
-            Hide(threshold, renderView1)
+            Hide(threshold, view)
 
             Delete(integrated)
             Delete(thresholdDisplay)
@@ -192,21 +181,18 @@ def calc_beads_loading(connectivity, colorVars, dataArr, nbeads):
 
 def mass_flux(reader, args):
 
-    scalarBarVisible = not args['no_scalar_bar']
-    geometry = args['geometry']
-    axisVisible = not args['no_coordinate_axis']
     colorVars = args['colorVars'] or reader.PointArrayStatus
     nSlice = args['mass_flux'] or 1
 
-    renderView1 = GetActiveViewOrCreate('RenderView')
-    display = Show(reader, renderView1)
+    view = GetActiveViewOrCreate('RenderView')
+    display = Show(reader, view)
     display.Representation = args['display_representation']
     # display.Representation = 'Surface With Edges'
 
     (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
     print(xmin,xmax,ymin,ymax,zmin,zmax)
 
-    Hide(reader, renderView1)
+    Hide(reader, view)
 
     ## NOTE: Only takes takes one color
     colorVar = colorVars[0]
@@ -264,15 +250,15 @@ def geometry_snapshot(reader, args):
     files       = args['FILES']
     filetype    = args['filetype']
 
-    renderView1 = GetActiveViewOrCreate('RenderView')
+    view = GetActiveViewOrCreate('RenderView')
     connectivity = Connectivity(Input=reader)
-    connectivityDisplay = Show(connectivity, renderView1)
+    connectivityDisplay = Show(connectivity, view)
 
     connectivityDisplay.Representation = args['display_representation']
-    renderView1.OrientationAxesVisibility = int(axisVisible)
+    view.OrientationAxesVisibility = int(axisVisible)
 
 
-    Hide(connectivity, renderView1)
+    Hide(connectivity, view)
 
     # NOTE: Threshold  range will be (0, n) where n is number of beads.
     # Typically, the interstitial domain is the last, n+1th region.
@@ -286,7 +272,7 @@ def geometry_snapshot(reader, args):
     print("Processing beads: {nbeads}".format(nbeads=nbeads))
     threshold = Threshold(Input=connectivity)
     threshold.ThresholdRange = [0, nbeads-1]
-    thresholdDisplay = Show(threshold, renderView1)
+    thresholdDisplay = Show(threshold, view)
     ColorBy(thresholdDisplay, None)
     # threshold.UpdatePipeline()
     thresholdDisplay.AmbientColor = [2/255, 61/255, 107/255]
@@ -296,22 +282,19 @@ def geometry_snapshot(reader, args):
     threshold = Threshold(Input=connectivity)
     threshold.ThresholdRange = [nbeads, nbeads]
     outerShell = Projection(threshold, 'clip')
-    outerShellDisplay = Show(outerShell, renderView1)
+    outerShellDisplay = Show(outerShell, view)
     ColorBy(outerShellDisplay, None)
     # outerShell.UpdatePipeline()
     outerShellDisplay.Opacity = 0.5
-    renderView1.InteractionMode = '2D'
+    view.InteractionMode = '2D'
 
-    renderView1.Update()
-    renderView1.ResetCamera()
-    renderView1.ViewSize = geometry
+    view.Update()
+    view.ResetCamera()
+    view.ViewSize = geometry
     setCameraOrientation(zoom) ## NOTE: Zoom doesn't work with InteractionMode = '2D'
 
     ## NOTE: Only works on the first file provided
-    SaveScreenshot(files[0].replace(filetype, 'png'), renderView1, ImageResolution=geometry, TransparentBackground=1)
-
-
-    pass
+    SaveScreenshot(files[0].replace(filetype, 'png'), view, ImageResolution=geometry, TransparentBackground=1)
 
 def snapshot(reader, args):
     colorVars = args['colorVars'] or reader.PointArrayStatus
@@ -328,15 +311,15 @@ def snapshot(reader, args):
     projection = Projection(reader, projectionType)
     # Render()
 
-    renderView1 = GetActiveViewOrCreate('RenderView')
+    view = GetActiveViewOrCreate('RenderView')
     # renderView1 = GetActiveView()
-    display = Show(projection, renderView1)
+    display = Show(projection, view)
     display.Representation = args['display_representation']
-    renderView1.OrientationAxesVisibility = int(axisVisible)
+    view.OrientationAxesVisibility = int(axisVisible)
 
-    renderView1.Update()
-    renderView1.ResetCamera()
-    renderView1.ViewSize = geometry
+    view.Update()
+    view.ResetCamera()
+    view.ViewSize = geometry
 
     display.UpdatePipeline()
 
@@ -362,15 +345,15 @@ def snapshot(reader, args):
 
             wLUT = GetColorTransferFunction(colorVar)
             wPWF = GetOpacityTransferFunction(colorVar)
-            HideScalarBarIfNotNeeded(wLUT, renderView1)
+            HideScalarBarIfNotNeeded(wLUT, view)
 
             wLUT.ApplyPreset('Rainbow Uniform', True)
 
-            renderView1.Update()
+            view.Update()
             UpdateScalarBars()
 
-            display.SetScalarBarVisibility(renderView1, scalarBarVisible)
-            SaveScreenshot(colorVar + '_' + ifile.replace(filetype, 'png'), renderView1, ImageResolution=geometry, TransparentBackground=1)
+            display.SetScalarBarVisibility(view, scalarBarVisible)
+            SaveScreenshot(colorVar + '_' + ifile.replace(filetype, 'png'), view, ImageResolution=geometry, TransparentBackground=1)
 
 def animate(reader, args):
     projectionType = args['projectionType']
@@ -400,13 +383,13 @@ def animate(reader, args):
 
     projection = Projection(reader, projectionType)
 
-    renderView1 = GetActiveViewOrCreate('RenderView')
-    projectionDisplay = Show(projection, renderView1)
+    view = GetActiveViewOrCreate('RenderView')
+    projectionDisplay = Show(projection, view)
     projectionDisplay.Representation = args['display_representation']
-    renderView1.OrientationAxesVisibility = int(axisVisible)
+    view.OrientationAxesVisibility = int(axisVisible)
     projectionDisplay.RescaleTransferFunctionToDataRange()
-    renderView1.ViewSize = geometry
-    renderView1.Update()
+    view.ViewSize = geometry
+    view.Update()
 
     setCameraOrientation(zoom)
 
@@ -423,31 +406,27 @@ def animate(reader, args):
 
         wLUT = GetColorTransferFunction(colorVar)
         wPWF = GetOpacityTransferFunction(colorVar)
-        HideScalarBarIfNotNeeded(wLUT, renderView1)
+        HideScalarBarIfNotNeeded(wLUT, view)
 
         wLUT.ApplyPreset('Rainbow Uniform', True)
 
-        renderView1.Update()
+        view.Update()
         UpdateScalarBars()
 
-        projectionDisplay.SetScalarBarVisibility(renderView1, scalarBarVisible)
-        SaveAnimation(colorVar + '.png', renderView1, ImageResolution=geometry, TransparentBackground=1, SuffixFormat='.%04d')
+        projectionDisplay.SetScalarBarVisibility(view, scalarBarVisible)
+        SaveAnimation(colorVar + '.png', view, ImageResolution=geometry, TransparentBackground=1, SuffixFormat='.%04d')
 
 
 def radial_shell_integrate(reader, args):
 
-    scalarBarVisible = not args['no_scalar_bar']
-    geometry = args['geometry']
-    axisVisible = not args['no_coordinate_axis']
-    zoom = args['zoom']
     colorVars = args['colorVars'] or reader.PointArrayStatus
     nRegions = int(args['radial_integrate'])
 
     ## Calc bounding box. Requires show
-    renderView1 = GetActiveViewOrCreate('RenderView')
-    display = Show(reader, renderView1)
+    view = GetActiveViewOrCreate('RenderView')
+    display = Show(reader, view)
     (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
-    Hide(reader, renderView1)
+    Hide(reader, view)
 
     # nRegions = 3
     nShells = nRegions + 1 #Including r = 0
@@ -519,32 +498,24 @@ def radial_shell_integrate(reader, args):
     csvWriter('radial_shell_integrate', radAvg, appended)
 
 
-# def chromatogram(reader, **kwargs):
-#     extractSurface1 = ExtractSurface(Input=testcase_0pvtu)
-#     generateSurfaceNormals1 = GenerateSurfaceNormals(Input=extractSurface1)
-#     threshold1 = Threshold(Input=generateSurfaceNormals1)
-#     threshold1.ThresholdRange = [1.0, 1.0]
-#     threshold1.Scalars = ['POINTS', 'Normals_Z']
 
 
 def cross_section_snapshots(reader, args):
     scalarBarVisible = not args['no_scalar_bar']
     geometry = args['geometry']
     axisVisible = not args['no_coordinate_axis']
-    zoom = args['zoom']
     colorVars = args['colorVars'] or reader.PointArrayStatus
     nSlice = args['cross_section_snapshots'] or 1
-    files = args['FILES']
 
-    renderView1 = GetActiveViewOrCreate('RenderView')
-    display = Show(reader, renderView1)
+    view = GetActiveViewOrCreate('RenderView')
+    display = Show(reader, view)
     display.Representation = args['display_representation']
     # display.Representation = 'Surface With Edges'
 
     (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
     print(xmin,xmax,ymin,ymax,zmin,zmax)
 
-    Hide(reader, renderView1)
+    Hide(reader, view)
 
     ## NOTE: Only takes takes one color
     colorVar = colorVars[0]
@@ -575,34 +546,34 @@ def cross_section_snapshots(reader, args):
         projection.SliceType.Normal = [0.0, 0.0, -1.0]
         projection.UpdatePipeline()
 
-        projectionDisplay = Show(projection, renderView1)
+        projectionDisplay = Show(projection, view)
         projectionDisplay.Representation = args['display_representation']
         # projectionDisplay.Representation = 'Surface With Edges'
-        renderView1.OrientationAxesVisibility = int(axisVisible)
+        view.OrientationAxesVisibility = int(axisVisible)
         projectionDisplay.RescaleTransferFunctionToDataRange()
 
-        renderView1.Update()
-        renderView1.ViewSize = geometry
-        renderView1.ResetCamera()
+        view.Update()
+        view.ViewSize = geometry
+        view.ResetCamera()
 
         ColorBy(projectionDisplay, ('POINTS', colorVar))
         projectionDisplay.RescaleTransferFunctionToDataRange()
 
         wLUT = GetColorTransferFunction(colorVar)
         wPWF = GetOpacityTransferFunction(colorVar)
-        HideScalarBarIfNotNeeded(wLUT, renderView1)
+        HideScalarBarIfNotNeeded(wLUT, view)
 
         ## NOTE: For color presets.
         wLUT.ApplyPreset('Rainbow Uniform', True)
 
-        renderView1.Update()
+        view.Update()
         UpdateScalarBars()
 
-        projectionDisplay.SetScalarBarVisibility(renderView1, scalarBarVisible)
+        projectionDisplay.SetScalarBarVisibility(view, scalarBarVisible)
 
-        SaveScreenshot(colorVar + '_' + str(count)+'.png', renderView1, ImageResolution=geometry, TransparentBackground=1)
+        SaveScreenshot(colorVar + '_' + str(count)+'.png', view, ImageResolution=geometry, TransparentBackground=1)
 
-        Hide(projection, renderView1)
+        Hide(projection, view)
 
 
 def setCameraOrientation(zoom):
@@ -641,6 +612,95 @@ def Projection(inputView, projectionType):
         projection = inputView
     return projection
 
+def chromatogram(reader, args):
+
+    colorVars = args['colorVars'] or reader.PointArrayStatus
+
+    timeKeeper = GetTimeKeeper()
+    nts = len(reader.TimestepValues)
+
+    renderView1 = GetActiveViewOrCreate('RenderView')
+    surfaces = ExtractSurface(Input=reader)
+    surfaceNormals = GenerateSurfaceNormals(Input=surfaces)
+
+    threshold = Threshold(Input=surfaceNormals)
+    threshold.ThresholdRange = [1.0, 1.0]
+    threshold.Scalars = ['POINTS', 'Normals_Z']
+
+    cellSize1 = CellSize(Input=threshold)
+    cellSize1.ComputeArea= 1
+    cellSize1.ComputeSum = 1
+
+    area = servermanager.Fetch(cellSize1)
+    area = dsa.WrapDataObject(area)
+    area = area.FieldData['Area'][0]
+    print("AREA:", area)
+    print("Note: calculating integral for only first scalar: scalar_0")
+
+    values = []
+
+    for timestep in range(nts):
+
+        timeKeeper.Time = timestep
+        threshold.UpdatePipeline(reader.TimestepValues[timestep])
+
+        integrated = IntegrateVariables(Input=threshold)
+        intdata = servermanager.Fetch(integrated)
+        intdata = dsa.WrapDataObject(intdata)
+
+        # for colorVar in colorVars:
+        value = intdata.PointData[colorVars[0]]
+        value = ns.vtk_to_numpy(value)
+        values.append(value[0]/area)  ## Average of c, instead of integ(c.dV)
+
+    print(values)
+
+    csvWriter('chromatogram.csv', reader.TimestepValues, values )
+
+def volumeIntegral(reader, args):
+    colorVars = args['colorVars'] or reader.PointArrayStatus
+
+    timeKeeper = GetTimeKeeper()
+    nts = len(reader.TimestepValues)
+
+    view = GetActiveViewOrCreate('RenderView')
+
+    # cellSize1 = CellSize(Input=reader)
+    # cellSize1.ComputeVolume= 1
+    # cellSize1.ComputeSum = 1
+    # volume = servermanager.Fetch(cellSize1)
+    # volume = dsa.WrapDataObject(volume)
+    # volume = volume.FieldData['Volume'][0]
+    # print("volume:", volume)
+
+    intOutput = {}
+    for colorVar in colorVars:
+        intOutput.update({colorVar: []})
+        print(type(intOutput[colorVar]))
+
+    for timestep in range(nts):
+
+        timeKeeper.Time = timestep
+        # print("Processing timestep: ", timestep, end="\r")
+        reader.UpdatePipeline(reader.TimestepValues[timestep])
+
+        integrated = IntegrateVariables(Input=reader)
+        intdata = servermanager.Fetch(integrated)
+        intdata = dsa.WrapDataObject(intdata)
+
+        volume = intdata.CellData['Volume'][0]
+
+        for colorVar in colorVars:
+            value = intdata.PointData[colorVar]
+            value = ns.vtk_to_numpy(value)[0]/volume
+            intOutput[colorVar].append(value)
+
+        Delete(integrated)
+
+    print(intOutput)
+    for colorVar in colorVars:
+        csvWriter(colorVar + '.integrated.csv', reader.TimestepValues, intOutput[colorVar])
+
 def main():
 
     ap = argparse.ArgumentParser()
@@ -654,6 +714,8 @@ def main():
     ap.add_argument("-css", "--cross-section-snapshots", type=int, required=False, help="Run snapshotter for n cross section slices")
     ap.add_argument("-gs", "--geometry-snapshot", required=False, action='store_true', help="Run snapshotter for n cross section slices")
     ap.add_argument("-p", "--projectionType", required=False, help="projection type: clip | slice")
+    ap.add_argument("-cg", "--chromatogram", required=False, action='store_true', help="extract chromatogram from surface with N=(0,0,1)")
+    ap.add_argument("-vi", "--volumeIntegral", required=False, action='store_true', help="Calculate volume integral for scalar values in the whole domain")
 
     ap.add_argument("-c", "--colorVars", required=False, nargs='*', help="color map variable")
     ap.add_argument("-g", "--geometry", required=False, nargs=2, type=int, default=[1750, 1300], help="Animation geometry size")
@@ -730,6 +792,12 @@ def main():
 
     if args['geometry_snapshot']:
         geometry_snapshot(reader, args)
+
+    if args['chromatogram']:
+        chromatogram(reader, args)
+
+    if args['volumeIntegral']:
+        volumeIntegral(reader, args)
 
     if args['writer']:
         writer=None
