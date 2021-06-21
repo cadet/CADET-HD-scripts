@@ -11,12 +11,18 @@
         > .yaml and .h5 files for use with CADET.
 
     @usage:
+        ## YAML to HDF5
         > yaml2hdf input.yaml -o output.h5                      # Convert input.yaml to output.h5
         > yaml2hdf base.yaml modification.yaml -o output.h5     # Update base.yaml with modification.yaml and write to output.h5
         > yaml2hdf modification.yaml -o output.h5 --update      # Update an existing output.h5 with modification.yaml
         > yaml2hdf input.yaml --print                           # Print input.yaml to stdout
+
+        ## HDF5 to YAML
         > yaml2hdf --reverse input.h5 --print                   # Print input.h5 to stdout
         > yaml2hdf --reverse input.h5 -o output.yaml            # Convert input.h5 to output.yaml
+
+        ## Diff ANY two files
+        > yaml2hdf --diff input.h5 new.yaml
 
         ## Additionally, use with `yq` to extract specific fields out of the yaml/hdf file
         > yaml2hdf --reverse input.h5 --print | yq '.output.solution.unit_001.solution_outlet_comp_000'
@@ -31,6 +37,10 @@ import yaml
 import argparse
 import numpy as np
 
+from deepdiff import DeepDiff
+from pprint import pprint
+from pathlib import Path
+
 from cadet import Cadet
 from addict import Dict
 
@@ -39,6 +49,7 @@ ap.add_argument("-o", "--output", help="Output hdf5 filename")
 ap.add_argument("-r", "--reverse", action='store_true', help="Convert hdf5 to yaml")
 ap.add_argument("-u", "--update", action='store_true', help="Update existing h5 file")
 ap.add_argument("-p", "--print", action='store_true', help="Print to stdout")
+ap.add_argument("-d", "--diff", nargs=2, help="Diff 2 files. Can diff yaml vs h5 as well.")
 ap.add_argument("files", nargs='*', help="Input files. Will be applied in order")
 args = vars(ap.parse_args())
 
@@ -78,8 +89,37 @@ def np2native(obj):
     else:
         return obj
 
+def load_h5(fname):
+    sim = Cadet()
+    sim.filename = fname
+    sim.load()
+    return(reconstruct(sim.root))
 
-if args['reverse']:
+
+if args['diff']:
+    ## Diff ANY two files (even h5 vs yaml)
+    ## Only prints changes
+
+    config1 = {}
+    config2 = {}
+
+    ext = Path(args['diff'][0]).suffix
+    if ext == ".h5":
+        config1 = load_h5(args['diff'][0])
+    elif ext == ".yaml" or ext == ".yml" :
+        with open(args['diff'][0], 'r') as inputfile:
+            config1 = yaml.load(inputfile, Loader=yaml.FullLoader)
+
+    ext = Path(args['diff'][1]).suffix
+    if ext == ".h5":
+        config2 = load_h5(args['diff'][1])
+    elif ext == ".yaml" or ext == ".yml" :
+        with open(args['diff'][1], 'r') as inputfile:
+            config2 = yaml.load(inputfile, Loader=yaml.FullLoader)
+
+    pprint(DeepDiff(config1, config2), indent=2)
+
+elif args['reverse']:
     ## HDF5 to YAML
 
     ## NOTE: The behavior of this branch should be up for discussion.
