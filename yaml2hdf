@@ -1,11 +1,35 @@
 #!/usr/bin/env python
 
+"""
+    YAML2HDF
+
+    @author: Jayghosh S. Rao j.rao@fz-juelich.de
+
+    @description:
+        > YAML files are much more user-friendly than HDF5 and JSON files.
+        > This tool wraps around CADET-Python to convert between
+        > .yaml and .h5 files for use with CADET.
+
+    @usage:
+        > yaml2hdf input.yaml -o output.h5                      # Convert input.yaml to output.h5
+        > yaml2hdf base.yaml modification.yaml -o output.h5     # Update base.yaml with modification.yaml and write to output.h5
+        > yaml2hdf modification.yaml -o output.h5 --update      # Update an existing output.h5 with modification.yaml
+        > yaml2hdf input.yaml --print                           # Print input.yaml to stdout
+        > yaml2hdf --reverse input.h5 --print                   # Print input.h5 to stdout
+        > yaml2hdf --reverse input.h5 -o output.yaml            # Convert input.h5 to output.yaml
+
+        ## Additionally, use with `yq` to extract specific fields out of the yaml/hdf file
+        > yaml2hdf --reverse input.h5 --print | yq '.output.solution.unit_001.solution_outlet_comp_000'
+
+    @notes:
+        > top level "meta" key is removed before converting both-ways.
+        > top level "output" key is removed before writing to h5.
+
+"""
+
 import yaml
 import argparse
 import numpy as np
-
-# from ruamel.yaml import YAML
-# import sys
 
 from cadet import Cadet
 from addict import Dict
@@ -17,8 +41,6 @@ ap.add_argument("-u", "--update", action='store_true', help="Update existing h5 
 ap.add_argument("-p", "--print", action='store_true', help="Print to stdout")
 ap.add_argument("files", nargs='*', help="Input files. Will be applied in order")
 args = vars(ap.parse_args())
-
-# TODO: Option to overwrite or append h5
 
 def reconstruct(dic:dict):
     """
@@ -35,6 +57,16 @@ def reconstruct(dic:dict):
             cleandict.update({key: value})
     return cleandict
 
+def update_nested(refdict:dict, newdict:dict):
+    for key, value in newdict.items():
+        if key in refdict.keys():
+            if isinstance(value, dict):
+                update_nested(refdict[key], newdict[key])
+            else:
+                refdict[key] = value
+        else:
+            refdict.update({key: value})
+
 def np2native(obj):
     """
     Convert from numpy types to python native types
@@ -49,12 +81,24 @@ def np2native(obj):
 
 if args['reverse']:
     ## HDF5 to YAML
+
+    ## NOTE: The behavior of this branch should be up for discussion.
+    ## Currently when provided with multiple files, generates ONE
+    ## final dict/file in line with the way the YAML->HDF flow works
+
     config = {}
     for fname in args['files']:
         sim = Cadet()
         sim.filename = fname
         sim.load()
-        config.update(reconstruct(sim.root))
+        # config = reconstruct(sim.root)                # Only writes/prints the last one
+        # config.update(reconstruct(sim.root))          # Non nested update. Always bad
+        update_nested(config, reconstruct(sim.root))    # Nested updates of all input h5 files
+
+    try:
+        del(config['meta'])
+    except KeyError:
+        pass
 
     if args['print']:
         print(yaml.dump(config, allow_unicode=True, default_flow_style=False))
@@ -62,13 +106,14 @@ if args['reverse']:
     if args['output']:
         with open(args['output'], 'w') as outfile:
                 yaml.dump(config, outfile)
+
 else:
     ## YAML to HDF5
-    ## Write to clean file
     config = {}
     for fname in args['files']:
         with open(fname, 'r') as inputfile:
-            config.update(yaml.load(inputfile, Loader=yaml.FullLoader))
+            dic = yaml.load(inputfile, Loader=yaml.FullLoader)
+            update_nested(config, dic)
 
     sim = Cadet()
 
@@ -79,8 +124,25 @@ else:
         sim.filename = args['output']
         sim.load()
         sim.root.update(Dict(config))
+
+        ## Do not add meta and output info to h5 file
+        try:
+            del(sim.root['meta'])
+            del(sim.root['output'])
+        except KeyError:
+            pass
+
         sim.save()
+
     elif args['output']:
         sim.filename = args['output']
         sim.root = Dict(config)
+
+        ## Do not add meta and output info to h5 file
+        try:
+            del(sim.root['meta'])
+            del(sim.root['output'])
+        except KeyError:
+            pass
+
         sim.save()
