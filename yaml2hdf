@@ -89,100 +89,73 @@ def np2native(obj):
     else:
         return obj
 
+def load_file(fname):
+    ext = Path(fname).suffix
+    config = {}
+    if ext == ".h5":
+        config = load_h5(fname)
+    elif ext == ".yaml" or ext == ".yml" :
+        with open(fname) as inputfile:
+            config = yaml.load(inputfile, Loader=yaml.FullLoader)
+    return config
+
+def save_file(config, fname, update=False):
+    ext = Path(fname).suffix
+    if ext == ".h5":
+        save_h5(config, fname, update)
+    elif ext == ".yaml" or ext == ".yml" :
+        save_yaml(config, fname)
+    return config
+
+def save_yaml(config, fname):
+    try:
+        del(config['meta'])
+    except KeyError:
+        pass
+
+    with open(fname, 'w') as outfile:
+            yaml.dump(config, outfile)
+
 def load_h5(fname):
     sim = Cadet()
     sim.filename = fname
     sim.load()
     return(reconstruct(sim.root))
 
+def save_h5(config, fname, update=False):
+    sim = Cadet()
+    sim.filename = fname
+
+    if update:
+        sim.root.update(Dict(config))
+    else:
+        sim.root = Dict(config)
+
+    ## Do not add meta and output info to h5 file
+    try:
+        del(sim.root['meta'])
+        del(sim.root['output'])
+    except KeyError:
+        pass
+
+    sim.save()
+
 
 if args['diff']:
     ## Diff ANY two files (even h5 vs yaml)
     ## Only prints changes
 
-    config1 = {}
-    config2 = {}
-
-    ext = Path(args['diff'][0]).suffix
-    if ext == ".h5":
-        config1 = load_h5(args['diff'][0])
-    elif ext == ".yaml" or ext == ".yml" :
-        with open(args['diff'][0], 'r') as inputfile:
-            config1 = yaml.load(inputfile, Loader=yaml.FullLoader)
-
-    ext = Path(args['diff'][1]).suffix
-    if ext == ".h5":
-        config2 = load_h5(args['diff'][1])
-    elif ext == ".yaml" or ext == ".yml" :
-        with open(args['diff'][1], 'r') as inputfile:
-            config2 = yaml.load(inputfile, Loader=yaml.FullLoader)
+    config1 = load_file(args['diff'][0])
+    config2 = load_file(args['diff'][1])
 
     pprint(DeepDiff(config1, config2), indent=2)
 
-elif args['reverse']:
-    ## HDF5 to YAML
-
-    ## NOTE: The behavior of this branch should be up for discussion.
-    ## Currently when provided with multiple files, generates ONE
-    ## final dict/file in line with the way the YAML->HDF flow works
-
+elif args['files']:
     config = {}
     for fname in args['files']:
-        sim = Cadet()
-        sim.filename = fname
-        sim.load()
-        # config = reconstruct(sim.root)                # Only writes/prints the last one
-        # config.update(reconstruct(sim.root))          # Non nested update. Always bad
-        update_nested(config, reconstruct(sim.root))    # Nested updates of all input h5 files
-
-    try:
-        del(config['meta'])
-    except KeyError:
-        pass
+        update_nested(config, load_file(fname))
 
     if args['print']:
         print(yaml.dump(config, allow_unicode=True, default_flow_style=False))
-
-    if args['output']:
-        with open(args['output'], 'w') as outfile:
-                yaml.dump(config, outfile)
-
-else:
-    ## YAML to HDF5
-    config = {}
-    for fname in args['files']:
-        with open(fname, 'r') as inputfile:
-            dic = yaml.load(inputfile, Loader=yaml.FullLoader)
-            update_nested(config, dic)
-
-    sim = Cadet()
-
-    if args['print']:
-        print(yaml.dump(config, allow_unicode=True, default_flow_style=False))
-
-    if args['update'] and args['output']:
-        sim.filename = args['output']
-        sim.load()
-        sim.root.update(Dict(config))
-
-        ## Do not add meta and output info to h5 file
-        try:
-            del(sim.root['meta'])
-            del(sim.root['output'])
-        except KeyError:
-            pass
-
-        sim.save()
-
     elif args['output']:
-        sim.filename = args['output']
-        sim.root = Dict(config)
-
-        ## Do not add meta and output info to h5 file
-        try:
-            del(sim.root['meta'])
-            del(sim.root['output'])
-        except KeyError:
-            pass
-
-        sim.save()
+        save_file(config, args['output'], update=args['update'])
