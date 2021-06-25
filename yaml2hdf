@@ -18,14 +18,14 @@
         > yaml2hdf input.yaml --print                           # Print input.yaml to stdout
 
         ## HDF5 to YAML
-        > yaml2hdf --reverse input.h5 --print                   # Print input.h5 to stdout
-        > yaml2hdf --reverse input.h5 -o output.yaml            # Convert input.h5 to output.yaml
+        > yaml2hdf input.h5 --print                   # Print input.h5 to stdout
+        > yaml2hdf input.h5 -o output.yaml            # Convert input.h5 to output.yaml
 
         ## Diff ANY two files
         > yaml2hdf --diff input.h5 new.yaml
 
         ## Additionally, use with `yq` to extract specific fields out of the yaml/hdf file
-        > yaml2hdf --reverse input.h5 --print | yq '.output.solution.unit_001.solution_outlet_comp_000'
+        > yaml2hdf input.h5 --print | yq '.output.solution.unit_001.solution_outlet_comp_000'
 
     @notes:
         > top level "meta" key is removed before converting both-ways.
@@ -40,15 +40,20 @@ import numpy as np
 from deepdiff import DeepDiff
 from pprint import pprint
 from pathlib import Path
+import tempfile
+import os
+
+from subprocess import run
 
 from cadet import Cadet
 from addict import Dict
 
-ap = argparse.ArgumentParser(description='Convert yaml to hdf5')
-ap.add_argument("-o", "--output", help="Output hdf5 filename")
-ap.add_argument("-r", "--reverse", action='store_true', help="Convert hdf5 to yaml")
+ap = argparse.ArgumentParser(description='Convert between yaml and hdf5')
+ap.add_argument("-o", "--output", help="Output filename")
 ap.add_argument("-u", "--update", action='store_true', help="Update existing h5 file")
 ap.add_argument("-p", "--print", action='store_true', help="Print to stdout")
+ap.add_argument("-k", "--key", choices=['input', 'output'], help="Print/write either 'input' or 'output' key only")
+ap.add_argument("-e", "--edit", help="Edit h5 files in place as html files")
 ap.add_argument("-d", "--diff", nargs=2, help="Diff 2 files. Can diff yaml vs h5 as well.")
 ap.add_argument("files", nargs='*', help="Input files. Will be applied in order")
 args = vars(ap.parse_args())
@@ -82,6 +87,8 @@ def np2native(obj):
     """
     Convert from numpy types to python native types
     """
+    if isinstance(obj, bytes):
+        return obj.decode('utf-8')
     if isinstance(obj, np.bytes_):
         return obj.tobytes().decode('utf-8')
     elif isinstance(obj, np.generic) or isinstance(obj,np.ndarray):
@@ -140,6 +147,13 @@ def save_h5(config, fname, update=False):
 
     sim.save()
 
+def delete_key(config:dict, key:str):
+    try:
+        del(config[key])
+    except KeyError:
+        pass
+    return config
+
 
 if args['diff']:
     ## Diff ANY two files (even h5 vs yaml)
@@ -150,12 +164,27 @@ if args['diff']:
 
     pprint(DeepDiff(config1, config2), indent=2)
 
+elif args['edit']:
+    config = load_file(args['edit'])
+    with tempfile.NamedTemporaryFile("w+") as tmpf:
+        yaml.dump(config, tmpf)
+        tmpf.seek(0)
+        run([str(os.getenv('EDITOR')), tmpf.name])
+        config = yaml.load(tmpf, Loader=yaml.FullLoader)
+    save_file(config, args['edit'])
+
 elif args['files']:
     config = {}
     for fname in args['files']:
         update_nested(config, load_file(fname))
 
+    if args['key'] == 'input':
+        config = delete_key(config, 'output')
+    elif args['key'] == 'output':
+        config = delete_key(config, 'input')
+
     if args['print']:
+        config = delete_key(config, 'meta')
         print(yaml.dump(config, allow_unicode=True, default_flow_style=False))
     elif args['output']:
         save_file(config, args['output'], update=args['update'])

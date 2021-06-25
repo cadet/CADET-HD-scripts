@@ -9,6 +9,8 @@ Extracts csv files from the given h5 files.
 if the given paths do not exist, or are empty, no csv is generated.
 """
 
+import itertools
+
 from cadet import Cadet
 import csv
 import argparse
@@ -39,8 +41,14 @@ for f in args['files']:
                 y = y[item]
             if len(y) == 0:
                 continue
-            with open(f + '.' + varstring.replace('/', '_') +'.csv', 'w') as f:
-                writer = csv.writer(f, delimiter=',')
+
+            ## flatten list (in case of bulk solution)
+            while isinstance(y[0], np.ndarray):
+                flatten = itertools.chain.from_iterable
+                y = list(flatten(y))
+
+            with open(''.join([f, '.', varstring.replace('/', '_'), '.csv' ]), 'w') as outfile:
+                writer = csv.writer(outfile, delimiter=',')
                 writer.writerows(zip(x, y))
 
     if args['integrate']:
