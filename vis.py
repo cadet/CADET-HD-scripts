@@ -618,6 +618,9 @@ def chromatogram(reader, args):
 
     timeKeeper = GetTimeKeeper()
     nts = len(reader.TimestepValues)
+    if nts == 0:
+        nts=1
+
 
     renderView1 = GetActiveViewOrCreate('RenderView')
     surfaces = ExtractSurface(Input=reader)
@@ -636,13 +639,17 @@ def chromatogram(reader, args):
     area = area.FieldData['Area'][0]
     print("AREA:", area)
     print("Note: calculating integral for only first scalar: scalar_0")
+    print("ColorVars:", colorVars)
 
     values = []
 
     for timestep in range(nts):
 
-        timeKeeper.Time = timestep
-        threshold.UpdatePipeline(reader.TimestepValues[timestep])
+        try:
+            timeKeeper.Time = timestep
+            threshold.UpdatePipeline(reader.TimestepValues[timestep])
+        except IndexError:
+            pass
 
         integrated = IntegrateVariables(Input=threshold)
         intdata = servermanager.Fetch(integrated)
@@ -701,31 +708,148 @@ def volumeIntegral(reader, args):
     for colorVar in colorVars:
         csvWriter(colorVar + '.integrated.csv', reader.TimestepValues, intOutput[colorVar])
 
+
+def shell_chromatograms(reader, args):
+
+    colorVars = args['colorVars'] or reader.PointArrayStatus
+    nRegions = int(args['shell_chromatograms'])
+
+    timeKeeper = GetTimeKeeper()
+    nts = len(reader.TimestepValues)
+
+    view = GetActiveViewOrCreate('RenderView')
+    ## Calc bounding box. Requires show
+    display = Show(reader, view)
+    (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+    Hide(reader, view)
+
+    surfaces = ExtractSurface(Input=reader)
+    surfaceNormals = GenerateSurfaceNormals(Input=surfaces)
+
+    threshold = Threshold(Input=surfaceNormals)
+    threshold.ThresholdRange = [1.0, 1.0]
+    threshold.Scalars = ['POINTS', 'Normals_Z']
+
+    cellSize1 = CellSize(Input=threshold)
+    cellSize1.ComputeArea= 1
+    cellSize1.ComputeSum = 1
+
+    total_area = servermanager.Fetch(cellSize1)
+    total_area = dsa.WrapDataObject(total_area)
+    total_area = total_area.FieldData['Area'][0]
+    print("AREA:", total_area)
+    print("Note: calculating integral for only first scalar: scalar_0")
+
+
+    nShells = nRegions + 1 #Including r = 0
+    rShells = []
+
+    R = (xmax - xmin + ymax - ymin)/4
+    print("R:", R)
+
+    shellType = 'EQUIDISTANT'
+    # shellType = 'EQUIVOLUME'
+    if shellType == 'EQUIVOLUME':
+        for n in range(nShells):
+            rShells.append(R * sqrt(n/nRegions))
+    elif shellType == 'EQUIDISTANT':
+        for n in range(nShells):
+            rShells.append(R * (n/nRegions))
+
+    print("rShells:", rShells)
+
+    appended = []
+    radAvg = []
+    dataList = [ [] for region in range(nRegions) ]
+
+
+    for timestep in range(nts):
+
+        timeKeeper.Time = timestep
+        threshold.UpdatePipeline(reader.TimestepValues[timestep])
+
+        print("its:", timestep, end=" ")
+
+        for radIn, radOut in zip(rShells[:-1], rShells[1:]):
+
+            index = rShells.index(radIn)
+
+            radAvg.append( (radIn + radOut) / 2 )
+
+            shell_area = np.pi * (radOut**2 - radIn**2)
+
+            clipOuter = Clip(Input=threshold)
+            clipOuter.ClipType = 'Cylinder'
+            clipOuter.ClipType.Axis = [0.0, 0.0, 1.0]
+            clipOuter.ClipType.Radius = radOut
+            Hide3DWidgets(proxy=clipOuter.ClipType)
+
+            # renderView1 = GetActiveViewOrCreate('RenderView')
+            # projectionDisplay = Show(clipOuter, renderView1)
+            # projectionDisplay.Representation = 'Surface'
+            # # projectionDisplay.Representation = 'Surface With Edges'
+            # renderView1.OrientationAxesVisibility = int(axisVisible)
+            # projectionDisplay.RescaleTransferFunctionToDataRange()
+
+            clipInner = Clip(Input=clipOuter)
+            clipInner.ClipType = 'Cylinder'
+            clipInner.ClipType.Axis = [0.0, 0.0, 1.0]
+            clipInner.ClipType.Radius = radIn
+            clipInner.Invert = 0
+
+            cellSize1 = CellSize(Input=clipInner)
+            cellSize1.ComputeVolume = 1
+            cellSize1.ComputeArea = 1
+            cellSize1.ComputeSum = 1
+
+            area = servermanager.Fetch(cellSize1)
+            area = dsa.WrapDataObject(area)
+            area = area.FieldData['Area'][0]
+            print("Shell Area:", area, "Analytical:", shell_area)
+
+            integrated = IntegrateVariables(Input=clipInner)
+            intdata = servermanager.Fetch(integrated)
+            intdata = dsa.WrapDataObject(intdata)
+
+            values = []
+            # for colorVar in colorVars:
+            value = intdata.PointData[colorVars[0]]
+            value = ns.vtk_to_numpy(value)
+            values.append(value[0]/area) ## Average of velocity, instead of integ(v.dV)
+
+            print(values)
+            # appended.extend(values)
+            dataList[index].extend(values)
+
+    for region in range(nRegions):
+        csvWriter('shell_chromatograms' + str(region), reader.TimestepValues, dataList[region])
+
 def main():
 
     ap = argparse.ArgumentParser()
 
-    ap.add_argument("-s", "--snapshot", required=False, action='store_true', help="run snapshotter")
-    ap.add_argument("-a", "--animate", required=False, action='store_true', help="run animator")
-    ap.add_argument("-d", "--distribute", required=False, help="Apply d3 filter and save data")
-    ap.add_argument("-m", "--mass-flux", required=False, help="Find mass flux at n different slices along the z direction")
-    ap.add_argument("-b", "--bead-loading", required=False, action='store_true', help="Output bead loading data")
-    ap.add_argument("-r", "--radial-integrate", required=False, help="Cylindrical shell integrate variables")
-    ap.add_argument("-css", "--cross-section-snapshots", type=int, required=False, help="Run snapshotter for n cross section slices")
-    ap.add_argument("-gs", "--geometry-snapshot", required=False, action='store_true', help="Run snapshotter for n cross section slices")
-    ap.add_argument("-p", "--projectionType", required=False, help="projection type: clip | slice")
-    ap.add_argument("-cg", "--chromatogram", required=False, action='store_true', help="extract chromatogram from surface with N=(0,0,1)")
-    ap.add_argument("-vi", "--volumeIntegral", required=False, action='store_true', help="Calculate volume integral for scalar values in the whole domain")
+    ap.add_argument("-s"  , "--snapshot"               , action='store_true', help="run snapshotter")
+    ap.add_argument("-a"  , "--animate"                , action='store_true', help="run animator")
+    ap.add_argument("-d"  , "--distribute"             , help="Apply d3 filter and save data")
+    ap.add_argument("-m"  , "--mass-flux"              , help="Find mass flux at n different slices along the z direction")
+    ap.add_argument("-b"  , "--bead-loading"           , action='store_true', help="Output bead loading data")
+    ap.add_argument("-r"  , "--radial-integrate"       , help="Cylindrical shell integrate variables")
+    ap.add_argument("-css", "--cross-section-snapshots", type=int           , help="Run snapshotter for n cross section slices")
+    ap.add_argument("-gs" , "--geometry-snapshot"      , action='store_true', help="Run snapshotter for n cross section slices")
+    ap.add_argument("-p"  , "--projectionType"         , help="projection type: clip | slice")
+    ap.add_argument("-cg" , "--chromatogram"           , action='store_true', help="extract chromatogram from surface with N=(0,0,1)")
+    ap.add_argument("-sc" , "--shell-chromatograms"    , type=int           , help="extract chromatogram from surface with N=(0,0,1) in radial shells")
+    ap.add_argument("-vi" , "--volumeIntegral"         , action='store_true', help="Calculate volume integral for scalar values in the whole domain")
 
-    ap.add_argument("-c", "--colorVars", required=False, nargs='*', help="color map variable")
-    ap.add_argument("-g", "--geometry", required=False, nargs=2, type=int, default=[1750, 1300], help="Animation geometry size")
-    ap.add_argument("-z", "--zoom", required=False, type=float, default=1, help="Zoom (camera.dolly) value for view")
-    ap.add_argument("-dr", "--display-representation", required=False, default='Surface', choices=['Surface With Edges', 'Surface'], help="Display representation")
-    ap.add_argument("-nsb", "--no-scalar-bar", required=False, action='store_true', default=False, help="Disable scalar bar visibility")
-    ap.add_argument("-nca", "--no-coordinate-axis", required=False, action='store_true', default=False, help="Disable coordinate axis visibility")
+    ap.add_argument("-c"  , "--colorVars"             , nargs='*'          , help="color map variable")
+    ap.add_argument("-g"  , "--geometry"              , nargs=2            , type=int                     , default=[1750, 1300], help="Animation geometry size")
+    ap.add_argument("-z"  , "--zoom"                  , type=float         , default=1                    , help="Zoom (camera.dolly) value for view")
+    ap.add_argument("-dr" , "--display-representation", default='Surface'  , choices=['Surface With Edges', 'Surface']   , help="Display representation")
+    ap.add_argument("-nsb", "--no-scalar-bar"         , action='store_true', default=False                , help="Disable scalar bar visibility")
+    ap.add_argument("-nca", "--no-coordinate-axis"    , action='store_true', default=False                , help="Disable coordinate axis visibility")
 
-    ap.add_argument("-f", "--filetype", required=False, default='pvtu', choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="filetype: xdmf | vtu | vtk | pvtu")
-    ap.add_argument("-w", "--writer", required=False, choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="writer: xdmf | vtu | vtk | pvtu")
+    ap.add_argument("-f", "--filetype", default='pvtu', choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="filetype: xdmf | vtu | vtk | pvtu")
+    ap.add_argument("-w", "--writer", choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="writer: xdmf | vtu | vtk | pvtu")
 
     ap.add_argument("FILES", nargs='*', help="files..")
 
@@ -795,6 +919,9 @@ def main():
 
     if args['chromatogram']:
         chromatogram(reader, args)
+
+    if args['shell_chromatograms']:
+        shell_chromatograms(reader, args)
 
     if args['volumeIntegral']:
         volumeIntegral(reader, args)
