@@ -70,8 +70,6 @@ def integrate(object, vars, normalize=None, timeArray=[]):
             value = ns.vtk_to_numpy(value)
             integrated_scalars.append(value[0]/volume)  ## Average of c, instead of integ(c.dV)
 
-    # return integrated_scalars
-
         integrated_over_time.append(integrated_scalars)
     return integrated_over_time
 
@@ -132,7 +130,9 @@ def get_cross_sections(reader, nSlice=1):
 def main():
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("-cg", "--chromatogram", help="Chromatogram: Integrate (0,0,1) surface of given volume, Integrate Area")
+    ap.add_argument("-cg", "--chromatogram", choices=['Volume', 'Area'], help="Chromatogram: Integrate (0,0,1) surface of given volume or Integrate given area")
+    ap.add_argument("-scg", "--shell-chromatograms", type=int, help="Calculate chromatograms in n shell sections of given SURFACE")
+    ap.add_argument("-s"  , "--scalars" , nargs='*' , help="Scalars to consider. (Previously colorvars).")
     ap.add_argument("-f", "--filetype", default='pvtu', choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="filetype: xdmf | vtu | vtk | pvtu")
     ap.add_argument("FILES", nargs='*', help="files..")
 
@@ -175,6 +175,9 @@ def main():
 
     timeKeeper = GetTimeKeeper()
     timeArray = reader.TimestepValues
+    nts = len(timeArray) or 1
+
+    scalars = args['scalars'] or reader.PointArrayStatus
 
     ## Specifically integrate to get the chromatogram output
     ## with either full volume input -> manually extract surfaces and chromatogram
@@ -201,6 +204,79 @@ def main():
 
         for scalar in reader.PointArrayStatus:
             csvWriter("".join([scalar, '.csv']), reader.TimestepValues, np.array(integratedData).T[list(reader.PointArrayStatus).index(scalar)])
+
+    elif args['shell_chromatograms']:
+        print("Running shell_chromatograms on provided SURFACE!")
+        nRegions = int(args['shell_chromatograms'])
+
+        view = GetActiveViewOrCreate('RenderView')
+        ## Calc bounding box. Requires show
+        display = Show(reader, view)
+        (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+        Hide(reader, view)
+
+        nShells = nRegions + 1 #Including r = 0
+        rShells = []
+
+        R = (xmax - xmin + ymax - ymin)/4
+        print("R:", R)
+
+        shellType = 'EQUIDISTANT'
+        # shellType = 'EQUIVOLUME'
+        if shellType == 'EQUIVOLUME':
+            for n in range(nShells):
+                rShells.append(R * sqrt(n/nRegions))
+        elif shellType == 'EQUIDISTANT':
+            for n in range(nShells):
+                rShells.append(R * (n/nRegions))
+
+        print("rShells:", rShells)
+
+        radAvg = []
+        integrated_over_time = [ [] for region in range(nRegions) ]
+        for timestep in range(nts):
+
+            timeKeeper.Time = timestep
+            reader.UpdatePipeline(reader.TimestepValues[timestep])
+
+            print("its:", timestep, end=" ")
+
+            for radIn, radOut in zip(rShells[:-1], rShells[1:]):
+
+                index = rShells.index(radIn)
+
+                radAvg.append( (radIn + radOut) / 2 )
+
+                shell_area = np.pi * (radOut**2 - radIn**2)
+
+                clipOuter = Clip(Input=reader)
+                clipOuter.ClipType = 'Cylinder'
+                clipOuter.ClipType.Axis = [0.0, 0.0, 1.0]
+                clipOuter.ClipType.Radius = radOut
+                Hide3DWidgets(proxy=clipOuter.ClipType)
+
+                # renderView1 = GetActiveViewOrCreate('RenderView')
+                # projectionDisplay = Show(clipOuter, renderView1)
+                # projectionDisplay.Representation = 'Surface'
+                # # projectionDisplay.Representation = 'Surface With Edges'
+                # renderView1.OrientationAxesVisibility = int(axisVisible)
+                # projectionDisplay.RescaleTransferFunctionToDataRange()
+
+                clipInner = Clip(Input=clipOuter)
+                clipInner.ClipType = 'Cylinder'
+                clipInner.ClipType.Axis = [0.0, 0.0, 1.0]
+                clipInner.ClipType.Radius = radIn
+                clipInner.Invert = 0
+
+                ## Since we handle time outside the integrate function, the
+                ## only entry in the outer list is the list of integrated scalars
+                ## at the given time
+                integratedData = integrate(clipInner, scalars, normalize='Area')
+                integrated_over_time[index].extend(integratedData)
+
+        for region in range(nRegions):
+            for scalar in scalars:
+                csvWriter("shell_{i}_{s}.cg".format(i=region, s=scalar), timeArray, np.array(integrated_over_time[region]).T[scalars.index(scalar)])
 
 if __name__ == "__main__":
     main()
