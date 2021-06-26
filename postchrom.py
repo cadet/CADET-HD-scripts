@@ -49,13 +49,17 @@ PHYS_MAP = {
 }
 
 
-def read_chromatogram(data_path):
+def readChromatogram(data_path):
     time= []
     conc= []
+    delimiter = ' '
+    with open(data_path, newline='') as csvfile:
+        if ',' in csvfile.readline():
+            delimiter = ','
     with open(data_path, newline='') as csvfile:
         # data = list(csv.reader(csvfile))
         for line in csvfile:
-            data_line = line.strip().split(' ')
+            data_line = line.strip().split(delimiter)
             data_line = list(filter(None, data_line))
             if (data_line != []):
                 time.append(float(data_line[0]))
@@ -147,7 +151,6 @@ def process_rngdexp(f,R):
     # act_int_val = math.pi * R * R * 2.09e-4
     avg = int_val/(math.pi * R * R)
     print("Average rngdexp = ", avg)
-    sys.exit()
     return avg
 
 
@@ -196,8 +199,6 @@ def main():
 
     u = xns_flow_data['rngdexp'][2:]
     u = ''.join(u)
-    # print(u)
-    # sys.exit(0)
     u_avg = process_rngdexp(u, R)
 
     if (simtype == 'b'):
