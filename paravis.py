@@ -42,7 +42,6 @@ def integrate(object, vars, normalize=None, timeArray=[]):
 
     # GetActiveViewOrCreate('RenderView')
 
-
     integrated_over_time = []
     for timestep in range(nts):
         try:
@@ -71,6 +70,9 @@ def integrate(object, vars, normalize=None, timeArray=[]):
             integrated_scalars.append(value[0]/volume)  ## Average of c, instead of integ(c.dV)
 
         integrated_over_time.append(integrated_scalars)
+
+        Delete(integrated)
+
     return integrated_over_time
 
 def project(inputView, projectionType, geometry='Plane', origin=None, normal=[1,0,0]):
@@ -273,6 +275,9 @@ def main():
                 ## at the given time
                 integratedData = integrate(clipInner, scalars, normalize='Area')
                 integrated_over_time[index].extend(integratedData)
+
+                Delete(clipInner)
+                Delete(clipOuter)
 
         for region in range(nRegions):
             for scalar in scalars:
