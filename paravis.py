@@ -276,7 +276,7 @@ def main():
 
         for region in range(nRegions):
             for scalar in scalars:
-                csvWriter("shell_{i}_{s}.cg".format(i=region, s=scalar), timeArray, np.array(integrated_over_time[region]).T[scalars.index(scalar)])
+                csvWriter("shell_{i}_{s}.cg".format(i=region, s=scalar), timeArray, np.array(integrated_over_time[region]).T[list(scalars).index(scalar)])
 
 if __name__ == "__main__":
     main()
