@@ -30,7 +30,8 @@ get_mixd_int_nrec(){
 }
 
 get_nts(){
-    NN=$(get_mixd_double_nrec ../mesh/mxyz $NSD)
+    # NN=$(get_mixd_double_nrec ../mesh/mxyz $NSD)
+    NN=$(get_mixd_double_nrec "${MESHDIR:-../mesh}/mxyz" $NSD)
     NTS=$(get_mixd_double_nrec $1 $(( 2*NN )) )
     echo $NTS
 }
