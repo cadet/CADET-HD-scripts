@@ -179,9 +179,10 @@ def main():
         sys.exit(-1)
 
     timeKeeper = GetTimeKeeper()
-    nts = len(timeArray) or 1
 
     timeArray = reader.TimestepValues
+    nts = len(timeArray) or 1
+
     scalars = args['scalars'] or reader.PointArrayStatus
     shellType = args['shelltype']
 
