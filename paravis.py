@@ -61,7 +61,7 @@ def integrate(object, vars, normalize=None, timeArray=[]):
             else:
                 print("".join(["Cannot normalize by ", normalize, ". No such CellData!"]))
 
-        print("{key}: {value}".format(key=normalize, value=volume))
+        # print("{key}: {value}".format(key=normalize, value=volume))
 
         integrated_scalars = []
         for var in vars:
@@ -134,8 +134,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-cg", "--chromatogram", choices=['Volume', 'Area'], help="Chromatogram: Integrate (0,0,1) surface of given volume or Integrate given area")
     ap.add_argument("-scg", "--shell-chromatograms", type=int, help="Calculate chromatograms in n shell sections of given SURFACE")
+
+    ap.add_argument("-st"  , "--shelltype", choices = ['EQUIDISTANT', 'EQUIVOLUME'], default='EQUIDISTANT', help="Shell discretization type")
     ap.add_argument("-s"  , "--scalars" , nargs='*' , help="Scalars to consider. (Previously colorvars).")
     ap.add_argument("-f", "--filetype", default='pvtu', choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="filetype: xdmf | vtu | vtk | pvtu")
+
     ap.add_argument("FILES", nargs='*', help="files..")
 
     args = vars(ap.parse_args())
@@ -176,10 +179,11 @@ def main():
         sys.exit(-1)
 
     timeKeeper = GetTimeKeeper()
-    timeArray = reader.TimestepValues
     nts = len(timeArray) or 1
 
+    timeArray = reader.TimestepValues
     scalars = args['scalars'] or reader.PointArrayStatus
+    shellType = args['shelltype']
 
     ## Specifically integrate to get the chromatogram output
     ## with either full volume input -> manually extract surfaces and chromatogram
@@ -195,14 +199,13 @@ def main():
         threshold.ThresholdRange = [1.0, 1.0]
         threshold.Scalars = ['POINTS', 'Normals_Z']
 
-        integratedData = integrate(threshold, reader.PointArrayStatus , normalize='Area', timeArray=timeArray)
+        integratedData = integrate(threshold, scalars, normalize='Area', timeArray=timeArray)
 
-        for scalar in reader.PointArrayStatus:
-            csvWriter("".join([scalar, '.csv']), reader.TimestepValues, np.array(integratedData).T[list(reader.PointArrayStatus).index(scalar)])
+        for scalar in scalars:
+            csvWriter("".join([scalar, '.csv']), timeArray, np.array(integratedData).T[list(scalars).index(scalar)])
 
     elif args['chromatogram'] == 'Area':
-        integratedData = integrate(reader, reader.PointArrayStatus, normalize='Area', timeArray=reader.TimestepValues)
-        print(integratedData)
+        integratedData = integrate(reader, scalars, normalize='Area', timeArray=reader.TimestepValues)
 
         for scalar in reader.PointArrayStatus:
             csvWriter("".join([scalar, '.csv']), reader.TimestepValues, np.array(integratedData).T[list(reader.PointArrayStatus).index(scalar)])
@@ -223,7 +226,7 @@ def main():
         R = (xmax - xmin + ymax - ymin)/4
         print("R:", R)
 
-        shellType = 'EQUIDISTANT'
+        # shellType = 'EQUIDISTANT'
         # shellType = 'EQUIVOLUME'
         if shellType == 'EQUIVOLUME':
             for n in range(nShells):
@@ -241,7 +244,7 @@ def main():
             timeKeeper.Time = timestep
             reader.UpdatePipeline(reader.TimestepValues[timestep])
 
-            print("its:", timestep, end=" ")
+            print("its:", timestep)
 
             for radIn, radOut in zip(rShells[:-1], rShells[1:]):
 
