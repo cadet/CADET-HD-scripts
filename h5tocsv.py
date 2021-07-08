@@ -90,6 +90,8 @@ for f in args['files']:
 
             par_radius = sim.root.input.model[unit].par_radius
 
+            ## TODO: Use numpy.squeeze to flatten array axis with length = 1
+
             y = [ g[0][0] / (par_radius) for g in y ]
 
             print(y)

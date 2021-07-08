@@ -1,9 +1,11 @@
 #!/bin/env -S pvpython --force-offscreen-rendering
 
+## https://www.paraview.org/Wiki/ParaView_and_Python#Control_the_camera
+
 """ The successor script to vis.py
 
-    - More modular
-    - Built for generic XNS
+    @ideal usage:
+        $ paravis.py --pipeline project screenshot --project clip Plane 0.1 z -s None -v z y
 
 """
 
@@ -23,15 +25,61 @@ def csvWriter(filename, x, y):
         writer = csv.writer(f)
         writer.writerows(zip(x, y))
 
-def setCameraOrientation(zoom):
-    camera = GetActiveCamera()
-    camera.SetFocalPoint(-1,0,0)
-    camera.SetPosition(1,0,0)
-    camera.SetViewUp(0,-1,0)
-    ResetCamera()
 
-    camera.Dolly(zoom)
-    Render()
+def reference_axisNormal(input:str):
+    if input.lower() == "x":
+        return [1, 0, 0]
+    elif input.lower() == "y":
+        return [0, 1, 0]
+    elif input.lower() == "z":
+        return [0, 0, 1]
+
+def screenshot(object, args):
+    view = GetActiveViewOrCreate('RenderView')
+
+    display = Show(object, view)
+    display.Representation = args['display_representation']
+    view.OrientationAxesVisibility = args['show_axis']
+
+    # view.Update()
+    # view.ResetCamera()
+    # view.ViewSize = args['geometry']
+
+    view_handler(args['view'], args['zoom'])
+
+    for scalar in args['scalars']:
+        print("Snapping", scalar )
+
+        display = Show(object, view)
+        display.Representation = args['display_representation']
+        view.OrientationAxesVisibility = args['show_axis']
+        display.RescaleTransferFunctionToDataRange()
+        display.UpdatePipeline()
+
+        view.Update()
+        view.ViewSize = args['geometry']
+        view.ResetCamera()
+        UpdateScalarBars()
+
+        if scalar == 'None':
+            ColorBy(display, None)
+        else:
+            ColorBy(display, ('POINTS', scalar))
+
+
+        wLUT = GetColorTransferFunction(scalar)
+        wPWF = GetOpacityTransferFunction(scalar)
+        HideScalarBarIfNotNeeded(wLUT, view)
+
+        wLUT.ApplyPreset('Rainbow Uniform', True)
+
+        view.Update()
+        UpdateScalarBars()
+
+        display.SetScalarBarVisibility(view, args['show_scalar_bar'])
+        SaveScreenshot('screenshot_' + scalar + '_' + args['FILES'][0].replace(args['filetype'], 'png'), view, ImageResolution=args['geometry'], TransparentBackground=1)
+        Hide(display, view)
+
 
 def integrate(object, vars, normalize=None, timeArray=[]):
     ## normalize= "Volume" or "Area" or None
@@ -75,36 +123,43 @@ def integrate(object, vars, normalize=None, timeArray=[]):
 
     return integrated_over_time
 
-def project(inputView, projectionType, geometry='Plane', origin=None, normal=[1,0,0]):
+# def project(object, projectionType, geometry='Plane', origin=None, normal=[1,0,0]):
+def project(object, args):
 
-    projectionView = GetActiveViewOrCreate('RenderView')
-    display = Show(inputView, projectionView)
+    projectionType = args['project'][0]
+    geometry = args['project'][1]
+    origin = args['project'][2]
+    normal = args['project'][3]
 
-    (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
-    Hide(inputView, projectionView)
+    origin, normal = default_origin_normal(object, origin, normal)
 
-    center = [ (xmax+xmin)/2, (ymax+ymin)/2, (zmax+zmin)/2,]
+    # projectionView = GetActiveViewOrCreate('RenderView')
+    # display = Show(object, projectionView)
+    # (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+    # Hide(object, projectionView)
+    # center = [ (xmax+xmin)/2, (ymax+ymin)/2, (zmax+zmin)/2,]
+    # if not origin:
+    #     origin=center
+    # else:
 
-    if not origin:
-        origin=center
 
     projection = None
-    if projectionType == 'Clip':
-        projection = Clip(Input=inputView)
+    if projectionType.lower() == 'clip':
+        projection = Clip(Input=object)
         projection.ClipType = geometry
-        projection.HyperTreeGridSlicer = geometry
+        # projection.HyperTreeGridSlicer = geometry
         projection.ClipType.Origin = origin
         projection.ClipType.Normal = normal
         Hide3DWidgets(proxy=projection.ClipType)
-    elif projectionType == 'Slice':
-        projection = Slice(Input=inputView)
+    elif projectionType.lower() == 'slice':
+        projection = Slice(Input=object)
         projection.SliceType = geometry
         projection.HyperTreeGridSlicer = geometry
         projection.SliceType.Origin = origin
         projection.SliceType.Normal = normal
         Hide3DWidgets(proxy=projection.SliceType)
     else:
-        projection = inputView
+        projection = object
 
     projection.UpdatePipeline()
 
@@ -127,7 +182,70 @@ def get_cross_sections(reader, nSlice=1):
 
     return slices
 
-# def get_radial_shells(reader):
+def default_origin_normal(reader, origin, normal):
+    """
+    Input origin and normal parameters for --project should be <float> <string>
+    This function takes those values and returns sane vectors to be used in the project() function
+
+    Uses origin as float factor to bounding box limits in the normal direction (unsigned).
+    Uses normal direction string to get vectors using direction_handler.
+
+    """
+    view = GetActiveViewOrCreate('RenderView')
+    display = Show(reader, view)
+    (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+    Hide(reader, view)
+
+    new_normal = direction_handler(normal)
+    origin_mask = [ xmin + float(origin) * (xmax - xmin), ymin + float(origin) * (ymax - ymin), zmin + float(origin) * (zmax - zmin)]
+    new_origin = [abs(x) * y for x,y in zip(new_normal, origin_mask)]
+
+    return new_origin, new_normal
+
+def direction_handler(dir:str):
+    """
+    Convert from "+x" notation to [1, 0, 0] notation
+    """
+    dir = dir.strip()
+    if len(dir) == 1:
+        dir = "+".join(["", dir])
+
+    if dir[1] == "x":
+        target = [1, 0, 0]
+    elif dir[1] == "y":
+        target = [0, 1, 0]
+    elif dir[1] == "z":
+        target = [0, 0, 1]
+    else:
+        raise(ValueError)
+
+    if dir[0] == "-":
+        target = [-x for x in target]
+    elif dir[0] != "+":
+        raise(ValueError)
+
+    return target
+
+def view_handler(viewopts:list, zoom:float):
+    """
+    Set camera view to viewopts ["+x", "-y"]  and zoom
+    """
+    target = direction_handler(viewopts[0])
+    viewup = direction_handler(viewopts[1])
+
+    print("Target:", target)
+    print("viewup:", viewup)
+
+    pos = [-x for x in target]
+
+    camera = GetActiveCamera()
+    camera.SetFocalPoint(target[0],target[1],target[2])
+    camera.SetPosition(pos[0], pos[1], pos[2])
+    camera.SetViewUp(viewup[0], viewup[1], viewup[2])
+    ResetCamera()
+
+    camera.Dolly(zoom)
+    Render()
 
 def main():
 
@@ -135,8 +253,18 @@ def main():
     ap.add_argument("-cg", "--chromatogram", choices=['Volume', 'Area'], help="Chromatogram: Integrate (0,0,1) surface of given volume or Integrate given area")
     ap.add_argument("-scg", "--shell-chromatograms", type=int, help="Calculate chromatograms in n shell sections of given SURFACE")
 
+    ap.add_argument("--project", nargs=4, default=['clip', 'Plane', 0.5, "x"], help="Projection. <clip|slice> <Plane|Cylinder..> <origin> <x|y|z>" )
+    ap.add_argument("--pipeline", nargs='+', help="Operations to be performed in pipe" )
+
     ap.add_argument("-st"  , "--shelltype", choices = ['EQUIDISTANT', 'EQUIVOLUME'], default='EQUIDISTANT', help="Shell discretization type")
-    ap.add_argument("-s"  , "--scalars" , nargs='*' , help="Scalars to consider. (Previously colorvars).")
+
+    ap.add_argument("-sa", "--show-axis", action='store_true', help="Show coordinate axis")
+    ap.add_argument("-sb", "--show-scalar-bar", action='store_true', help="Show scalar color bar")
+    ap.add_argument("-dr", "--display-representation", default='Surface', choices=['Surface', 'Surface With Edges', 'Points'],  help="Show Surface, Surface With Edges, etc")
+    ap.add_argument("-s", "--scalars" , nargs='*' , help="Scalars to consider. (Previously colorvars).")
+    ap.add_argument("-z", "--zoom", type=float, default=1, help="Zoom (camera.dolly) value for view")
+    ap.add_argument("-v", "--view", nargs=2, default=["+x",  "+y"], help="Set view: target, viewup. Use +x, -z notation.")
+    ap.add_argument("-g", "--geometry", nargs=2, type=int, default=[1750, 1300], help="Animation geometry size")
     ap.add_argument("-f", "--filetype", default='pvtu', choices=['xdmf', 'vtu', 'vtk', 'pvtu'], help="filetype: xdmf | vtu | vtk | pvtu")
 
     ap.add_argument("FILES", nargs='*', help="files..")
@@ -183,7 +311,9 @@ def main():
     timeArray = reader.TimestepValues
     nts = len(timeArray) or 1
 
-    scalars = args['scalars'] or reader.PointArrayStatus
+    args['scalars'] = args['scalars'] or reader.PointArrayStatus
+
+    scalars = args['scalars']
     shellType = args['shelltype']
 
     ## Specifically integrate to get the chromatogram output
@@ -286,6 +416,27 @@ def main():
         for region in range(nRegions):
             for scalar in scalars:
                 csvWriter("shell_{i}_{s}.cg".format(i=region, s=scalar), timeArray, np.array(integrated_over_time[region]).T[list(scalars).index(scalar)])
+
+    # object = reader
+    # for operation in args['pipeline']:
+    #     if operation == 'project':
+    #         object = project(object, args)
+    #     elif operation == 'screenshot':
+    #         screenshot(object, args)
+    #     elif operation == 'animate':
+    #         raise(NotImplementedError)
+    #     elif operation == 'integrate':
+    #         raise(NotImplementedError)
+
+    ## Supported pipeline operations
+    supported_operations = {
+        'project': project,
+        'screenshot': screenshot
+    }
+
+    object = reader
+    for operation in args['pipeline']:
+        object = supported_operations[operation](object, args)
 
 if __name__ == "__main__":
     main()

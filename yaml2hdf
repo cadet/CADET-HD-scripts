@@ -58,22 +58,31 @@ ap.add_argument("-d", "--diff", nargs=2, help="Diff 2 files. Can diff yaml vs h5
 ap.add_argument("files", nargs='*', help="Input files. Will be applied in order")
 args = vars(ap.parse_args())
 
+## TODO: Might not be required
 def reconstruct(dic:dict):
     """
     Convert from addict dict filled with numpy types to
     dict filled with python native types
     """
-    cleandict = {}
+    # cleandict = {}
+    dic = dict(dic)
     for key in dic.keys():
         if isinstance(dic[key], Dict):
             value = reconstruct(dic[key])
-            cleandict.update({key: value})
+            # cleandict.update({key: value})
+            dic.update({key: value})
         else:
             value = np2native(dic[key])
-            cleandict.update({key: value})
-    return cleandict
+            # cleandict.update({key: value})
+            dic.update({key: value})
+    # return cleandict
+    return dic
 
 def update_nested(refdict:dict, newdict:dict):
+    """
+    Update a dictionary in a nested manner.
+    (Don't just overwrite top level key/values as is default behavior)
+    """
     for key, value in newdict.items():
         if key in refdict.keys():
             if isinstance(value, dict):
@@ -121,7 +130,7 @@ def save_yaml(config, fname):
         pass
 
     with open(fname, 'w') as outfile:
-            yaml.dump(config, outfile)
+            yaml.dump(config, outfile, default_flow_style=None)
 
 def load_h5(fname):
     sim = Cadet()
@@ -165,6 +174,7 @@ if args['diff']:
     pprint(DeepDiff(config1, config2), indent=2)
 
 elif args['edit']:
+    ## TODO: Make this faster for files with large outputs: 2D files
     config = load_file(args['edit'])
     with tempfile.NamedTemporaryFile("w+") as tmpf:
         yaml.dump(config, tmpf)
@@ -185,6 +195,6 @@ elif args['files']:
 
     if args['print']:
         config = delete_key(config, 'meta')
-        print(yaml.dump(config, allow_unicode=True, default_flow_style=False))
+        print(yaml.dump(config, allow_unicode=True, default_flow_style=None))
     elif args['output']:
         save_file(config, args['output'], update=args['update'])
