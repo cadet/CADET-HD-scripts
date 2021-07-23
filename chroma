@@ -32,7 +32,7 @@ from os import environ, chdir, stat
 from tempfile import NamedTemporaryFile
 from multiprocessing import Pool, current_process
 
-if environ.get('LMOD_DIR'):
+if 'jureca' in str(environ.get('HOSTNAME')):
     from env_modules_python import module # type: ignore
 
 def find_up_recursive(name, startdir='.', stopdir='~'):
@@ -162,7 +162,8 @@ def edit_files(FILES:list):
     subprocess.call(cmdlist)
 
 def set_stage():
-    if environ.get('LMOD_DIR'):
+    # if environ.get('LMOD_DIR'):
+    if 'jureca' in str(environ.get('HOSTNAME')):
         # module('--force purge')
         # module('use /usr/local/software/jureca/OtherStages')
         # module('load ' + STAGE)
@@ -249,7 +250,8 @@ def decompose_flow():
     chdir('FLOW/mesh/')
 
     if config['decompose'] != 'no':
-        if environ.get('LMOD_DIR'):
+        # if environ.get('LMOD_DIR'):
+        if 'jureca' in str(environ.get('HOSTNAME')):
             module('load GCC/9.3.0 ParaStationMPI/5.4.7-1 ParMETIS/4.0.3-double Boost')
 
     if config['decompose'] == 'no':
@@ -282,7 +284,8 @@ def decompose_mass():
     chdir('MASS/mesh/')
 
     if config['decompose'] != 'no':
-        if environ.get('LMOD_DIR'):
+        # if environ.get('LMOD_DIR'):
+        if 'jureca' in str(environ.get('HOSTNAME')):
             module('load GCC/9.3.0 ParaStationMPI/5.4.7-1 ParMETIS/4.0.3-double Boost')
 
     if config['decompose'] == 'no':
