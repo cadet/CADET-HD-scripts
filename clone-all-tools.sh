@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 ## NOTE: Usage: 
 # ./clone-all-tools.sh will clone everything listed below to the current directory
 #       --https: will pull via https
