@@ -34,6 +34,119 @@ def reference_axisNormal(input:str):
     elif input.lower() == "z":
         return [0, 0, 1]
 
+# def project(object, projectionType, geometry='Plane', origin=None, normal=[1,0,0]):
+def project(object, args):
+
+    projectionType = args['project'][0]
+    geometry = args['project'][1]
+    origin = args['project'][2]
+    normal = args['project'][3]
+
+    origin, normal = default_origin_normal(object, origin, normal)
+
+    # projectionView = GetActiveViewOrCreate('RenderView')
+    # display = Show(object, projectionView)
+    # (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+    # Hide(object, projectionView)
+    # center = [ (xmax+xmin)/2, (ymax+ymin)/2, (zmax+zmin)/2,]
+    # if not origin:
+    #     origin=center
+    # else:
+
+
+    projection = None
+    if projectionType.lower() == 'clip':
+        projection = Clip(Input=object)
+        projection.ClipType = geometry
+        # projection.HyperTreeGridSlicer = geometry
+        projection.ClipType.Origin = origin
+        projection.ClipType.Normal = normal
+        Hide3DWidgets(proxy=projection.ClipType)
+    elif projectionType.lower() == 'slice':
+        projection = Slice(Input=object)
+        projection.SliceType = geometry
+        projection.HyperTreeGridSlicer = geometry
+        projection.SliceType.Origin = origin
+        projection.SliceType.Normal = normal
+        Hide3DWidgets(proxy=projection.SliceType)
+    else:
+        projection = object
+
+    projection.UpdatePipeline()
+
+    return projection
+
+def GRM2D(object, args):
+    ## Split into axial columns
+    ## Split into cylindrical columns
+    ## Integrate
+
+    view = GetActiveViewOrCreate('RenderView')
+    display = Show(object, view)
+    display.Representation = args['display_representation']
+    (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+    radius = ((xmax-xmin) + (ymax-ymin)) / 4
+    length = zmax - zmin
+    print("Length: {}, Radius: {}".format(length, radius))
+
+    nRad = 5               # Number of radial regions
+    nCol = 10              # Number of axial regions
+
+    # dx = length/nCol
+    # dr = radius/nRad
+
+    colEdges = np.linspace(zmin, zmax, nCol+1)
+    radEdges = np.linspace(0,radius,nRad+1) if args['shelltype'] == 'EQUIDISTANT' else list(x/nRad * radius for x in range(nRad+1))
+
+
+    Hide(reader, view)
+    nColEdgeFractions = linspace(0,1,nCol+1)
+    nRadEdgeFractions = linspace(0,1,nRad+1)
+
+    ## NOTE: Object must be reader
+    timeArray = object.TimestepValues
+
+    nts = len(timeArray) or 1
+
+    for timestep in range(nts):
+
+        timeKeeper.Time = timestep
+        reader.UpdatePipeline(reader.TimestepValues[timestep])
+
+        # for leftEdge, rightEdge in zip(colEdges[:-1], colEdges[1:]):
+        for leftEdge, rightEdge in zip(nColEdgeFractions[:-1], nColEdgeFractions[1:]):
+
+            clipLeftArgs = { 'project' : ['clip', 'Plane', leftEdge , '-z'] }
+            clipRightArgs = { 'project' : ['clip', 'Plane', rightEdge, '+z'] }
+
+            clipLeft = project(object, clipLeftArgs)
+            clipRight = project(clipLeft, clipRightArgs)
+
+            for radIn, radOut in zip(radEdges[:-1], radEdges[1:]):
+                radAvg.append( (radIn + radOut) / 2 )
+
+                clipOuter = Clip(Input=clipRight)
+                clipOuter.ClipType = 'Cylinder'
+                clipOuter.ClipType.Axis = [0.0, 0.0, 1.0]
+                clipOuter.ClipType.Radius = radOut
+                Hide3DWidgets(proxy=clipOuter.ClipType)
+
+                # renderView1 = GetActiveViewOrCreate('RenderView')
+                # projectionDisplay = Show(clipOuter, renderView1)
+                # projectionDisplay.Representation = 'Surface'
+                # # projectionDisplay.Representation = 'Surface With Edges'
+                # renderView1.OrientationAxesVisibility = int(axisVisible)
+                # projectionDisplay.RescaleTransferFunctionToDataRange()
+
+                clipInner = Clip(Input=clipOuter)
+                clipInner.ClipType = 'Cylinder'
+                clipInner.ClipType.Axis = [0.0, 0.0, 1.0]
+                clipInner.ClipType.Radius = radIn
+                clipInner.Invert = 0
+
+                integrated_scalars = integrate(clipInner, args['scalars'], normalize='Volume')
+
+
 def screenshot(object, args):
     view = GetActiveViewOrCreate('RenderView')
 
@@ -102,6 +215,9 @@ def integrate(object, vars, normalize=None, timeArray=[]):
         intdata = servermanager.Fetch(integrated)
         intdata = dsa.WrapDataObject(intdata)
 
+        if not intdata:
+            raise(AssertionError)
+
         volume=1
         if normalize in choices:
             if normalize in intdata.CellData.keys():
@@ -123,47 +239,6 @@ def integrate(object, vars, normalize=None, timeArray=[]):
 
     return integrated_over_time
 
-# def project(object, projectionType, geometry='Plane', origin=None, normal=[1,0,0]):
-def project(object, args):
-
-    projectionType = args['project'][0]
-    geometry = args['project'][1]
-    origin = args['project'][2]
-    normal = args['project'][3]
-
-    origin, normal = default_origin_normal(object, origin, normal)
-
-    # projectionView = GetActiveViewOrCreate('RenderView')
-    # display = Show(object, projectionView)
-    # (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
-    # Hide(object, projectionView)
-    # center = [ (xmax+xmin)/2, (ymax+ymin)/2, (zmax+zmin)/2,]
-    # if not origin:
-    #     origin=center
-    # else:
-
-
-    projection = None
-    if projectionType.lower() == 'clip':
-        projection = Clip(Input=object)
-        projection.ClipType = geometry
-        # projection.HyperTreeGridSlicer = geometry
-        projection.ClipType.Origin = origin
-        projection.ClipType.Normal = normal
-        Hide3DWidgets(proxy=projection.ClipType)
-    elif projectionType.lower() == 'slice':
-        projection = Slice(Input=object)
-        projection.SliceType = geometry
-        projection.HyperTreeGridSlicer = geometry
-        projection.SliceType.Origin = origin
-        projection.SliceType.Normal = normal
-        Hide3DWidgets(proxy=projection.SliceType)
-    else:
-        projection = object
-
-    projection.UpdatePipeline()
-
-    return projection
 
 def get_cross_sections(reader, nSlice=1):
     ## Should return list of cross sections of a geometry
@@ -304,7 +379,7 @@ def main():
         reader = LegacyVTKReader(FileNames=args['FILES'])
     else:
         print("Unsupported File Format!")
-        sys.exit(-1)
+        raise(ValueError)
 
     timeKeeper = GetTimeKeeper()
 
@@ -417,18 +492,6 @@ def main():
             for scalar in scalars:
                 csvWriter("shell_{i}_{s}.cg".format(i=region, s=scalar), timeArray, np.array(integrated_over_time[region]).T[list(scalars).index(scalar)])
 
-    # object = reader
-    # for operation in args['pipeline']:
-    #     if operation == 'project':
-    #         object = project(object, args)
-    #     elif operation == 'screenshot':
-    #         screenshot(object, args)
-    #     elif operation == 'animate':
-    #         raise(NotImplementedError)
-    #     elif operation == 'integrate':
-    #         raise(NotImplementedError)
-
-    ## Supported pipeline operations
     supported_operations = {
         'project': project,
         'screenshot': screenshot
