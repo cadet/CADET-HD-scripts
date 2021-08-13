@@ -6,6 +6,6 @@ all: install
 
 install: 
 	@for script in $(SCRIPTS); do \
-		echo ln -sfn $(PWD)/$$script $(prefix)/bin/$$script; \
+		ln -sfn $(PWD)/$$script $(prefix)/bin/$$script; \
 	done
 
