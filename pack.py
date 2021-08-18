@@ -10,6 +10,7 @@
         scaling factor: two packing.xyzd might not have the same dimensions. This helps fix that.
 
 @NOTE: Doesn't work with porosity-controlled genmesh output meshes yet!!.
+@NOTE: porosity is calculated for the cylinder length provided, not for void spaces yet
 """
 
 # [NOTE]: In this script, we only deal with radial variation, so other multiplexes are ignored
