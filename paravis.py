@@ -15,6 +15,7 @@ from vtkmodules.numpy_interface import dataset_adapter as dsa
 import vtk.util.numpy_support as ns #type:ignore
 from math import sqrt
 import numpy as np
+import struct
 
 import argparse
 import os
@@ -25,6 +26,18 @@ def csvWriter(filename, x, y):
         writer = csv.writer(f)
         writer.writerows(zip(x, y))
 
+def arr_to_bin(arr, filename, dataformat):
+    # NOTE: see https://docs.python.org/3/library/struct.html
+    with(open(filename, 'wb')) as output:
+        for i in arr:
+            output.write(struct.pack(dataformat, i))
+
+def arr_to_bin_unpacked(arr, filename, vartype):
+    ## vartype = d, f etc
+    ## NOTE: uses native by default endianness
+    ## Probably faster than the default one
+    with(open(filename, 'wb')) as output:
+        output.write(struct.pack(str(len(arr)) + vartype, *arr))
 
 def reference_axisNormal(input:str):
     if input.lower() == "x":
@@ -89,8 +102,10 @@ def GRM2D(object, args):
     length = zmax - zmin
     print("Length: {}, Radius: {}".format(length, radius))
 
-    nRad = 5               # Number of radial regions
-    nCol = 10              # Number of axial regions
+    # nCol = 10              # Number of axial regions
+    # nRad = 5               # Number of radial regions
+    nCol = args['grm_2d'][0]
+    nRad = args['grm_2d'][1]
 
     # dx = length/nCol
     # dr = radius/nRad
@@ -99,22 +114,32 @@ def GRM2D(object, args):
     radEdges = np.linspace(0,radius,nRad+1) if args['shelltype'] == 'EQUIDISTANT' else list(x/nRad * radius for x in range(nRad+1))
 
 
-    Hide(reader, view)
-    nColEdgeFractions = linspace(0,1,nCol+1)
-    nRadEdgeFractions = linspace(0,1,nRad+1)
+    # Hide(object, view)
+    nColEdgeFractions = np.linspace(0,1,nCol+1)
+    nRadEdgeFractions = np.linspace(0,1,nRad+1)
 
-    ## NOTE: Object must be reader
+    ## TODO: Make these function arguments
+    timeKeeper = GetTimeKeeper()
     timeArray = object.TimestepValues
-
     nts = len(timeArray) or 1
+
+    # ## NOTE: Object must be reader
+    # timeArray = object.TimestepValues
+
+    ## Output vector. Should contain (nts X nCol X nRad X nScalar)
+    grm2d_output = []
 
     for timestep in range(nts):
 
         timeKeeper.Time = timestep
-        reader.UpdatePipeline(reader.TimestepValues[timestep])
+        # object.UpdatePipeline(reader.TimestepValues[timestep])
+        # object.UpdatePipeline(timeArray[timestep])
+        object.UpdatePipeline()
 
         # for leftEdge, rightEdge in zip(colEdges[:-1], colEdges[1:]):
         for leftEdge, rightEdge in zip(nColEdgeFractions[:-1], nColEdgeFractions[1:]):
+            SetActiveSource(object)
+            print('[{}, {}]'.format(leftEdge, rightEdge))
 
             clipLeftArgs = { 'project' : ['clip', 'Plane', leftEdge , '-z'] }
             clipRightArgs = { 'project' : ['clip', 'Plane', rightEdge, '+z'] }
@@ -122,8 +147,11 @@ def GRM2D(object, args):
             clipLeft = project(object, clipLeftArgs)
             clipRight = project(clipLeft, clipRightArgs)
 
+            radAvg = []
+
             for radIn, radOut in zip(radEdges[:-1], radEdges[1:]):
                 radAvg.append( (radIn + radOut) / 2 )
+                # print('--> [{}, {}]: {}'.format(radIn, radOut, (radIn+radOut)/2))
 
                 clipOuter = Clip(Input=clipRight)
                 clipOuter.ClipType = 'Cylinder'
@@ -145,6 +173,18 @@ def GRM2D(object, args):
                 clipInner.Invert = 0
 
                 integrated_scalars = integrate(clipInner, args['scalars'], normalize='Volume')
+                # print('---->', integrated_scalars[0])
+                grm2d_output.extend(integrated_scalars[0])
+
+                Delete(clipInner)
+                Delete(clipOuter)
+
+            Delete(clipLeft)
+            Delete(clipRight)
+
+    # print(grm2d_output)
+    # arr_to_bin(grm2d_output, 'grm2doutput.bin', 'd')
+    arr_to_bin_unpacked(grm2d_output, 'grm2doutput_unpacked.bin', 'd')
 
 
 def screenshot(object, args):
@@ -327,6 +367,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-cg", "--chromatogram", choices=['Volume', 'Area'], help="Chromatogram: Integrate (0,0,1) surface of given volume or Integrate given area")
     ap.add_argument("-scg", "--shell-chromatograms", type=int, help="Calculate chromatograms in n shell sections of given SURFACE")
+    ap.add_argument("--grm-2d", nargs=2, type=int, help="Split into axial and radial sections and integrate scalars for fitting with 2D GRM. args: <ncol> <nrad>")
 
     ap.add_argument("--project", nargs=4, default=['clip', 'Plane', 0.5, "x"], help="Projection. <clip|slice> <Plane|Cylinder..> <origin> <x|y|z>" )
     ap.add_argument("--pipeline", nargs='+', help="Operations to be performed in pipe" )
@@ -492,6 +533,13 @@ def main():
             for scalar in scalars:
                 csvWriter("shell_{i}_{s}.cg".format(i=region, s=scalar), timeArray, np.array(integrated_over_time[region]).T[list(scalars).index(scalar)])
 
+    elif args['grm_2d']:
+        GRM2D(reader, args)
+
+
+    ## NOTE: Pipeline operations below [EXPERIMENTAL]
+    ## The idea is to provide the sequence of operations on the commandline
+    ##  and execute it here
     supported_operations = {
         'project': project,
         'screenshot': screenshot
