@@ -102,6 +102,12 @@ def arr_to_bin(arr, filename, dataformat):
         for i in arr:
             output.write(struct.pack(dataformat, i))
 
+def arr_to_bin_unpacked(arr, filename, vartype):
+    ## vartype = d, f etc
+    ## NOTE: uses native by default endianness
+    with(open(filename, 'wb')) as output:
+        output.write(struct.pack(str(len(arr)) + vartype, *arr))
+
 def arr_to_ascii(arr, filename):
     with(open(filename, 'w')) as output:
         for item in arr:
