@@ -11,6 +11,7 @@ import argparse
 
 # axes.prop_cycle : cycler('color', ['0C5DA5', '00B945', 'FF9500', 'FF2C00', '845B97', '474747', '9e9e9e'])
 
+## FIXME: This limits the number of plots by len(COLORS) due to the for-zip loop
 COLORS = ['#0C5DA5', '#00B945', '#FF9500', '#FF2C00', '#845B97', '#474747', '#9e9e9e']
 
 def normalize(data, refValue):

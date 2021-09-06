@@ -47,15 +47,18 @@ def loadh5(col_dispersion, filename, ref_curve_filename):
     sim.filename = filename
     sim.load()
 
+    ## NOTE: Sets the col_dispersion to UNIT_002
     sim.root.input.model.unit_002.col_dispersion = col_dispersion
 
     sim.save()
     runout = sim.run()
     if runout.returncode != 0:
+        print(runout)
         raise RuntimeError
     sim.load()
 
     x = sim.root.output.solution.solution_times
+    ## NOTE: Solution is taken from UNIT_003
     y = sim.root.output.solution.unit_003.solution_outlet_comp_000
 
     x0, y0 = readChromatogram(ref_curve_filename)
