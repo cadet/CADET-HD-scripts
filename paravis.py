@@ -32,11 +32,11 @@ def arr_to_bin(arr, filename, dataformat):
         for i in arr:
             output.write(struct.pack(dataformat, i))
 
-def arr_to_bin_unpacked(arr, filename, vartype):
+def arr_to_bin_unpacked(arr, filename, vartype, mode:str='w'):
     ## vartype = d, f etc
     ## NOTE: uses native by default endianness
     ## Probably faster than the default one
-    with(open(filename, 'wb')) as output:
+    with(open(filename, mode+'b')) as output:
         output.write(struct.pack(str(len(arr)) + vartype, *arr))
 
 def reference_axisNormal(input:str):
@@ -129,6 +129,11 @@ def GRM2D(object, args):
     ## Output vector. Should contain (nts X nCol X nRad X nScalar)
     grm2d_output = []
 
+    grm2d_output_filename = 'grm2d_output.bin'
+
+    ## Hack to remove previous file
+    arr_to_bin([], grm2d_output_filename, 'd')
+
     for timestep in range(nts):
 
         timeKeeper.Time = timestep
@@ -136,10 +141,15 @@ def GRM2D(object, args):
         # object.UpdatePipeline(timeArray[timestep])
         object.UpdatePipeline()
 
+        grm2d_timestep_output = []
+
+        print("--> TS: {}".format(timestep))
+
         # for leftEdge, rightEdge in zip(colEdges[:-1], colEdges[1:]):
         for leftEdge, rightEdge in zip(nColEdgeFractions[:-1], nColEdgeFractions[1:]):
+            print("  |--> Col: {}/{}".format(np.where(nColEdgeFractions == rightEdge)[0][0],nCol))
             SetActiveSource(object)
-            print('[{}, {}]'.format(leftEdge, rightEdge))
+            # print('[{}, {}]'.format(leftEdge, rightEdge))
 
             clipLeftArgs = { 'project' : ['clip', 'Plane', leftEdge , '-z'] }
             clipRightArgs = { 'project' : ['clip', 'Plane', rightEdge, '+z'] }
@@ -152,6 +162,8 @@ def GRM2D(object, args):
             for radIn, radOut in zip(radEdges[:-1], radEdges[1:]):
                 radAvg.append( (radIn + radOut) / 2 )
                 # print('--> [{}, {}]: {}'.format(radIn, radOut, (radIn+radOut)/2))
+
+                print('    |--> Rad: {}/{}'.format(np.where(radEdges == radOut)[0][0], nRad))
 
                 clipOuter = Clip(Input=clipRight)
                 clipOuter.ClipType = 'Cylinder'
@@ -174,7 +186,7 @@ def GRM2D(object, args):
 
                 integrated_scalars = integrate(clipInner, args['scalars'], normalize='Volume')
                 # print('---->', integrated_scalars[0])
-                grm2d_output.extend(integrated_scalars[0])
+                grm2d_timestep_output.extend(integrated_scalars[0])
 
                 Delete(clipInner)
                 Delete(clipOuter)
@@ -182,9 +194,14 @@ def GRM2D(object, args):
             Delete(clipLeft)
             Delete(clipRight)
 
+        grm2d_output.extend(grm2d_timestep_output)
+        arr_to_bin_unpacked(grm2d_timestep_output, 'grm2d_appended.bin', 'd', mode='a')
+
     # print(grm2d_output)
-    # arr_to_bin(grm2d_output, 'grm2doutput.bin', 'd')
-    arr_to_bin_unpacked(grm2d_output, 'grm2doutput_unpacked.bin', 'd')
+    ## NOTE: Uncomment one of the below to save from RAM to disk
+    # arr_to_bin(grm2d_output, grm2d_output_filename, 'd')
+    # arr_to_bin_unpacked(grm2d_output, grm2d_output_filename, 'd')
+    print("DONE!")
 
 
 def screenshot(object, args):
@@ -309,6 +326,7 @@ def default_origin_normal(reader, origin, normal):
     view = GetActiveViewOrCreate('RenderView')
     display = Show(reader, view)
     (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+    # print('bbox: ', xmin,xmax,ymin,ymax,zmin,zmax)
     Hide(reader, view)
 
     new_normal = direction_handler(normal)
@@ -546,6 +564,8 @@ def main():
     }
 
     object = reader
+    args['pipeline'] = args['pipeline'] or []
+
     for operation in args['pipeline']:
         object = supported_operations[operation](object, args)
 
