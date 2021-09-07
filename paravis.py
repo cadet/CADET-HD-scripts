@@ -138,8 +138,8 @@ def GRM2D(object, args):
 
         timeKeeper.Time = timestep
         # object.UpdatePipeline(reader.TimestepValues[timestep])
-        # object.UpdatePipeline(timeArray[timestep])
-        object.UpdatePipeline()
+        object.UpdatePipeline(timeArray[timestep])
+        # object.UpdatePipeline()
 
         grm2d_timestep_output = []
 
@@ -149,13 +149,23 @@ def GRM2D(object, args):
         for leftEdge, rightEdge in zip(nColEdgeFractions[:-1], nColEdgeFractions[1:]):
             print("  |--> Col: {}/{}".format(np.where(nColEdgeFractions == rightEdge)[0][0],nCol))
             SetActiveSource(object)
-            # print('[{}, {}]'.format(leftEdge, rightEdge))
+            print('[{}, {}]'.format(leftEdge, rightEdge))
 
-            clipLeftArgs = { 'project' : ['clip', 'Plane', leftEdge , '-z'] }
-            clipRightArgs = { 'project' : ['clip', 'Plane', rightEdge, '+z'] }
+            # clipLeftArgs = { 'project' : ['clip', 'Plane', leftEdge , '-z'] }
+            # clipRightArgs = { 'project' : ['clip', 'Plane', rightEdge, '+z'] }
+            # clipLeft = project(object, clipLeftArgs)
+            # clipRight = project(clipLeft, clipRightArgs)
+            ## screenshot(clipRight, args, suffix=str(leftEdge) + '_')
 
-            clipLeft = project(object, clipLeftArgs)
-            clipRight = project(clipLeft, clipRightArgs)
+            clipBox = Clip(Input=object)
+            clipBox.ClipType = 'Box'
+            clipBox.Exact = 1
+            clipBox.ClipType.UseReferenceBounds = 1
+            clipBox.ClipType.Bounds = [0.0, 1.0, 0.0, 1.0, leftEdge, rightEdge]
+            # clipBox.UpdatePipeline()
+
+            # Hide(object, view)
+            # screenshot(clipBox, args, suffix=str(leftEdge) + '_')
 
             radAvg = []
 
@@ -165,7 +175,8 @@ def GRM2D(object, args):
 
                 print('    |--> Rad: {}/{}'.format(np.where(radEdges == radOut)[0][0], nRad))
 
-                clipOuter = Clip(Input=clipRight)
+                # clipOuter = Clip(Input=clipRight)
+                clipOuter = Clip(Input=clipBox)
                 clipOuter.ClipType = 'Cylinder'
                 clipOuter.ClipType.Axis = [0.0, 0.0, 1.0]
                 clipOuter.ClipType.Radius = radOut
@@ -175,7 +186,7 @@ def GRM2D(object, args):
                 # projectionDisplay = Show(clipOuter, renderView1)
                 # projectionDisplay.Representation = 'Surface'
                 # # projectionDisplay.Representation = 'Surface With Edges'
-                # renderView1.OrientationAxesVisibility = int(axisVisible)
+                # renderView1.OrientationAxesVisibility = int(args['show_axis'])
                 # projectionDisplay.RescaleTransferFunctionToDataRange()
 
                 clipInner = Clip(Input=clipOuter)
@@ -184,6 +195,15 @@ def GRM2D(object, args):
                 clipInner.ClipType.Radius = radIn
                 clipInner.Invert = 0
 
+                # renderView1 = GetActiveViewOrCreate('RenderView')
+                # projectionDisplay = Show(clipInner, renderView1)
+                # projectionDisplay.Representation = 'Surface'
+                # # projectionDisplay.Representation = 'Surface With Edges'
+                # renderView1.OrientationAxesVisibility = int(args['show_axis'])
+                # projectionDisplay.RescaleTransferFunctionToDataRange()
+
+                # screenshot(clipInner, args, suffix=str(radIn) + "_")
+
                 integrated_scalars = integrate(clipInner, args['scalars'], normalize='Volume')
                 # print('---->', integrated_scalars[0])
                 grm2d_timestep_output.extend(integrated_scalars[0])
@@ -191,8 +211,9 @@ def GRM2D(object, args):
                 Delete(clipInner)
                 Delete(clipOuter)
 
-            Delete(clipLeft)
-            Delete(clipRight)
+            # Delete(clipLeft)
+            # Delete(clipRight)
+            Delete(clipBox)
 
         grm2d_output.extend(grm2d_timestep_output)
         arr_to_bin_unpacked(grm2d_timestep_output, 'grm2d_appended.bin', 'd', mode='a')
@@ -204,7 +225,7 @@ def GRM2D(object, args):
     print("DONE!")
 
 
-def screenshot(object, args):
+def screenshot(object, args, suffix=''):
     view = GetActiveViewOrCreate('RenderView')
 
     display = Show(object, view)
@@ -247,7 +268,7 @@ def screenshot(object, args):
         UpdateScalarBars()
 
         display.SetScalarBarVisibility(view, args['show_scalar_bar'])
-        SaveScreenshot('screenshot_' + scalar + '_' + args['FILES'][0].replace(args['filetype'], 'png'), view, ImageResolution=args['geometry'], TransparentBackground=1)
+        SaveScreenshot('screenshot_' + scalar + '_' + suffix + args['FILES'][0].replace(args['filetype'], 'png'), view, ImageResolution=args['geometry'], TransparentBackground=1)
         Hide(display, view)
 
 
