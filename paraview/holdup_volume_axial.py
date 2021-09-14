@@ -6,13 +6,19 @@ Script to calculate holdup volumes at different axial lengths of a given column.
 Assumes input to be concentrations in only the interstitial region.
 """
 
-# import numpy as np
+import csv
+import numpy as np
 import math
 import argparse
 import os
 from paraview.simple import *
 from vtkmodules.numpy_interface import dataset_adapter as dsa
 import vtk.util.numpy_support as ns #type:ignore
+
+def csvWriter(filename, x, y):
+    with open(filename, 'w') as f:
+        writer = csv.writer(f)
+        writer.writerows(zip(x, y))
 
 def default_origin_normal(reader, origin, normal):
     """
@@ -192,6 +198,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--project", nargs=4, default=['clip', 'Plane', 0.5, "x"], help="Projection. <clip|slice> <Plane|Cylinder..> <origin> <x|y|z>" )
 
+    ap.add_argument("--timesteps", required=True,  help="Timesteps file. ASCII, newline separated.")
+
     ap.add_argument("-sa", "--show-axis", action='store_true', help="Show coordinate axis")
     ap.add_argument("-sb", "--show-scalar-bar", action='store_true', help="Show scalar color bar")
     ap.add_argument("-dr", "--display-representation", default='Surface', choices=['Surface', 'Surface With Edges', 'Points'],  help="Show Surface, Surface With Edges, etc")
@@ -203,6 +211,9 @@ def main():
 
     ap.add_argument("FILES", nargs='*', help="files..")
     args = vars(ap.parse_args())
+
+    with open(args['timesteps'], 'r') as inputfile:
+        timesteps_from_file = [float(time) for time in inputfile]
 
     if len(args['FILES']) == 0:
         filetype = args['filetype']
@@ -242,6 +253,9 @@ def main():
     timeKeeper = GetTimeKeeper()
 
     timeArray = reader.TimestepValues
+
+    assert(len(timeArray) == len(timesteps_from_file))
+
     nts = len(timeArray) or 1
 
     args['scalars'] = args['scalars'] or reader.PointArrayStatus
@@ -256,35 +270,50 @@ def main():
     (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
     Hide(reader, view)
 
-    R_cyl = ((xmax - xmin) + (ymax - ymin))/ 4
-    length_full = zmax - zmin
+    nCol = 5
+    nColEdgeFractions = np.linspace(0,1,nCol+1)
 
-    cut_fraction = 0.1
+    HV_anas = [0]
+    HV_nums = [0]
 
-    clipped = project(reader, { 'project': ['clip', 'Plane', cut_fraction, '+z'] })
-    sliced  = project(reader, { 'project': ['slice', 'Plane', cut_fraction, '+z'] })
+    for cut_fraction in nColEdgeFractions[1:]:
 
-    integrated = IntegrateVariables(Input=clipped)
-    intdata = servermanager.Fetch(integrated)
-    intdata = dsa.WrapDataObject(intdata)
-    volume_int = intdata.CellData['Volume'][0]
+        SetActiveSource(reader)
+        # print("Cut Fraction:", cut_fraction)
 
-    volume_cyl = math.pi * R_cyl**2 * length_full * cut_fraction
+        R_cyl = ((xmax - xmin) + (ymax - ymin))/ 4
+        length_full = zmax - zmin
 
-    volume_beads = volume_cyl - volume_int
+        clipped = project(reader, { 'project': ['clip', 'Plane', cut_fraction, '+z'] })
+        sliced  = project(reader, { 'project': ['slice', 'Plane', cut_fraction, '+z'] })
 
-    HV_ana = ana_holdup_vol(volume_int, volume_beads)
+        integrated = IntegrateVariables(Input=clipped)
+        intdata = servermanager.Fetch(integrated)
+        intdata = dsa.WrapDataObject(intdata)
+        volume_int = intdata.CellData['Volume'][0]
 
-    integratedData = integrate(sliced, scalars, normalize='Area', timeArray=timeArray)
-    integratedData = [ y for x in integratedData for y in x ]
+        volume_cyl = math.pi * R_cyl**2 * length_full * cut_fraction
 
-    print(integratedData)
-    print(timeArray)
+        volume_beads = volume_cyl - volume_int
 
-    HV_num = num_holdup_vol(timeArray, integratedData, R_cyl, 2.09e-4, 7.14e-3)
+        HV_ana = ana_holdup_vol(volume_int, volume_beads)
+        HV_anas.append(HV_ana)
 
-    print("HV_ana =", HV_ana)
-    print("HV_num =", HV_num)
+        integratedData = integrate(sliced, scalars, normalize='Area', timeArray=timesteps_from_file)
+        integratedData = [ y for x in integratedData for y in x ]
+
+        HV_num = num_holdup_vol(timesteps_from_file, integratedData, R_cyl, 2.09e-4, 7.14e-3)
+        HV_nums.append(HV_num)
+
+        Delete(integrated)
+        Delete(clipped)
+        Delete(sliced)
+
+    print(HV_anas)
+    print(HV_nums)
+
+    csvWriter('HV_analytical.csv', nColEdgeFractions, HV_anas)
+    csvWriter('HV_numerical.csv', nColEdgeFractions, HV_nums)
 
 if __name__ == "__main__":
     main()
