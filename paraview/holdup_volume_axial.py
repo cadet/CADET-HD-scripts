@@ -157,6 +157,7 @@ def integrate(object, vars, normalize=None, timeArray=[]):
     nts = len(timeArray) or 1
 
     # GetActiveViewOrCreate('RenderView')
+    print("Integration call")
 
     integrated_over_time = []
     for timestep in range(nts):
@@ -165,6 +166,8 @@ def integrate(object, vars, normalize=None, timeArray=[]):
             object.UpdatePipeline(timeArray[timestep])
         except IndexError:
             pass
+
+        print("Integration time: ", timestep)
 
         integrated = IntegrateVariables(Input=object)
         intdata = servermanager.Fetch(integrated)
@@ -180,7 +183,7 @@ def integrate(object, vars, normalize=None, timeArray=[]):
             else:
                 print("".join(["Cannot normalize by ", normalize, ". No such CellData!"]))
 
-        # print("{key}: {value}".format(key=normalize, value=volume))
+        print("{key}: {value}".format(key=normalize, value=volume))
 
         integrated_scalars = []
         for var in vars:
@@ -199,6 +202,7 @@ def main():
     ap.add_argument("--project", nargs=4, default=['clip', 'Plane', 0.5, "x"], help="Projection. <clip|slice> <Plane|Cylinder..> <origin> <x|y|z>" )
 
     ap.add_argument("--timesteps", required=True,  help="Timesteps file. ASCII, newline separated.")
+    ap.add_argument("--ncol", type=int, default=5, help="Number of axial column sections.")
 
     ap.add_argument("-sa", "--show-axis", action='store_true', help="Show coordinate axis")
     ap.add_argument("-sb", "--show-scalar-bar", action='store_true', help="Show scalar color bar")
@@ -270,7 +274,10 @@ def main():
     (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
     Hide(reader, view)
 
-    nCol = 5
+    R_cyl = ((xmax - xmin) + (ymax - ymin))/ 4
+    length_full = zmax - zmin
+
+    nCol = args['ncol']
     nColEdgeFractions = np.linspace(0,1,nCol+1)
 
     HV_anas = [0]
@@ -278,14 +285,10 @@ def main():
 
     for cut_fraction in nColEdgeFractions[1:]:
 
-        SetActiveSource(reader)
         # print("Cut Fraction:", cut_fraction)
 
-        R_cyl = ((xmax - xmin) + (ymax - ymin))/ 4
-        length_full = zmax - zmin
-
+        SetActiveSource(reader)
         clipped = project(reader, { 'project': ['clip', 'Plane', cut_fraction, '+z'] })
-        sliced  = project(reader, { 'project': ['slice', 'Plane', cut_fraction, '+z'] })
 
         integrated = IntegrateVariables(Input=clipped)
         intdata = servermanager.Fetch(integrated)
@@ -299,24 +302,28 @@ def main():
         HV_ana = ana_holdup_vol(volume_int, volume_beads)
         HV_anas.append(HV_ana)
 
+        Delete(integrated)
+        Delete(clipped)
+
+        SetActiveSource(reader)
+        sliced  = project(reader, { 'project': ['slice', 'Plane', cut_fraction, '+z'] })
+
         integratedData = integrate(sliced, scalars, normalize='Area', timeArray=timeArray)
         integratedData = [ y for x in integratedData for y in x ]
 
         HV_num = num_holdup_vol(timesteps_from_file, integratedData, R_cyl, 2.09e-4, 7.14e-3)
         HV_nums.append(HV_num)
 
-        Delete(integrated)
-        Delete(clipped)
         Delete(sliced)
 
     print(HV_anas)
     print(HV_nums)
-    HV_ratios = [ x/y for x,y in zip(HV_nums, HV_anas)]
+    HV_ratios = [ x/y for x,y in zip(HV_nums[1:], HV_anas[1:])]
     print(HV_ratios)
 
     csvWriter('HV_analytical.csv', nColEdgeFractions, HV_anas)
     csvWriter('HV_numerical.csv', nColEdgeFractions, HV_nums)
-    csvWriter('HV_ratios.csv', nColEdgeFractions, HV_ratios)
+    csvWriter('HV_ratios.csv', nColEdgeFractions[1:], HV_ratios)
 
 if __name__ == "__main__":
     main()
