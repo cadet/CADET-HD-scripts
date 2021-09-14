@@ -12,6 +12,72 @@ import argparse
 import os
 from paraview.simple import *
 
+def default_origin_normal(reader, origin, normal):
+    """
+    Input origin and normal parameters for --project should be <float> <string>
+    This function takes those values and returns sane vectors to be used in the project() function
+
+    Uses origin as float factor to bounding box limits in the normal direction (unsigned).
+    Uses normal direction string to get vectors using direction_handler.
+
+    """
+    view = GetActiveViewOrCreate('RenderView')
+    display = Show(reader, view)
+    (xmin,xmax,ymin,ymax,zmin,zmax) = GetActiveSource().GetDataInformation().GetBounds()
+    # print('bbox: ', xmin,xmax,ymin,ymax,zmin,zmax)
+    Hide(reader, view)
+
+    new_normal = direction_handler(normal)
+    origin_mask = [ xmin + float(origin) * (xmax - xmin), ymin + float(origin) * (ymax - ymin), zmin + float(origin) * (zmax - zmin)]
+    new_origin = [abs(x) * y for x,y in zip(new_normal, origin_mask)]
+
+    return new_origin, new_normal
+
+def direction_handler(dir:str):
+    """
+    Convert from "+x" notation to [1, 0, 0] notation
+    """
+    dir = dir.strip()
+    if len(dir) == 1:
+        dir = "+".join(["", dir])
+
+    if dir[1] == "x":
+        target = [1, 0, 0]
+    elif dir[1] == "y":
+        target = [0, 1, 0]
+    elif dir[1] == "z":
+        target = [0, 0, 1]
+    else:
+        raise(ValueError)
+
+    if dir[0] == "-":
+        target = [-x for x in target]
+    elif dir[0] != "+":
+        raise(ValueError)
+
+    return target
+
+def view_handler(viewopts:list, zoom:float):
+    """
+    Set camera view to viewopts ["+x", "-y"]  and zoom
+    """
+    target = direction_handler(viewopts[0])
+    viewup = direction_handler(viewopts[1])
+
+    print("Target:", target)
+    print("viewup:", viewup)
+
+    pos = [-x for x in target]
+
+    camera = GetActiveCamera()
+    camera.SetFocalPoint(target[0],target[1],target[2])
+    camera.SetPosition(pos[0], pos[1], pos[2])
+    camera.SetViewUp(viewup[0], viewup[1], viewup[2])
+    ResetCamera()
+
+    camera.Dolly(zoom)
+    Render()
+
 def ana_holdup_vol(v_i, v_b):
     """
     Calculate analytical holdup volume
