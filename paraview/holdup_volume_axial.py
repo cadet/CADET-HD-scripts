@@ -201,6 +201,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--project", nargs=4, default=['clip', 'Plane', 0.5, "x"], help="Projection. <clip|slice> <Plane|Cylinder..> <origin> <x|y|z>" )
 
+    ap.add_argument("--analytical", action='store_true', help="Calculate analytical holdup volume. Assumes interstitial mesh and data as input.")
+    ap.add_argument("--numerical", action='store_true', help="Calculate numerical holdup volume. Assumes full mesh and data as input.")
+
     ap.add_argument("--timesteps", required=True,  help="Timesteps file. ASCII, newline separated.")
     ap.add_argument("--ncol", type=int, default=5, help="Number of axial column sections.")
 
@@ -283,47 +286,54 @@ def main():
     HV_anas = [0]
     HV_nums = [0]
 
-    for cut_fraction in nColEdgeFractions[1:]:
+    ## NOTE: This is only accurate if we have only the interstitial mesh
+    if args['analytical']:
+        for cut_fraction in nColEdgeFractions[1:]:
 
-        # print("Cut Fraction:", cut_fraction)
+            # print("Cut Fraction:", cut_fraction)
 
-        SetActiveSource(reader)
-        clipped = project(reader, { 'project': ['clip', 'Plane', cut_fraction, '+z'] })
+            SetActiveSource(reader)
+            clipped = project(reader, { 'project': ['clip', 'Plane', cut_fraction, '+z'] })
 
-        integrated = IntegrateVariables(Input=clipped)
-        intdata = servermanager.Fetch(integrated)
-        intdata = dsa.WrapDataObject(intdata)
-        volume_int = intdata.CellData['Volume'][0]
+            integrated = IntegrateVariables(Input=clipped)
+            intdata = servermanager.Fetch(integrated)
+            intdata = dsa.WrapDataObject(intdata)
+            volume_int = intdata.CellData['Volume'][0]
 
-        volume_cyl = math.pi * R_cyl**2 * length_full * cut_fraction
+            volume_cyl = math.pi * R_cyl**2 * length_full * cut_fraction
 
-        volume_beads = volume_cyl - volume_int
+            volume_beads = volume_cyl - volume_int
 
-        HV_ana = ana_holdup_vol(volume_int, volume_beads)
-        HV_anas.append(HV_ana)
+            HV_ana = ana_holdup_vol(volume_int, volume_beads)
+            HV_anas.append(HV_ana)
 
-        Delete(integrated)
-        Delete(clipped)
+            Delete(integrated)
+            Delete(clipped)
 
-        SetActiveSource(reader)
-        sliced  = project(reader, { 'project': ['slice', 'Plane', cut_fraction, '+z'] })
+        csvWriter('HV_analytical.csv', nColEdgeFractions, HV_anas)
 
-        integratedData = integrate(sliced, scalars, normalize='Area', timeArray=timeArray)
-        integratedData = [ y for x in integratedData for y in x ]
+    ## NOTE: This is only accurate if we have the full mesh including beads.
+    if args['numerical']:
+        for cut_fraction in nColEdgeFractions[1:]:
 
-        HV_num = num_holdup_vol(timesteps_from_file, integratedData, R_cyl, 2.09e-4, 7.14e-3)
-        HV_nums.append(HV_num)
+            SetActiveSource(reader)
+            sliced  = project(reader, { 'project': ['slice', 'Plane', cut_fraction, '+z'] })
 
-        Delete(sliced)
+            integratedData = integrate(sliced, scalars, normalize='Area', timeArray=timeArray)
+            integratedData = [ y for x in integratedData for y in x ]
 
-    print(HV_anas)
-    print(HV_nums)
-    HV_ratios = [ x/y for x,y in zip(HV_nums[1:], HV_anas[1:])]
-    print(HV_ratios)
+            HV_num = num_holdup_vol(timesteps_from_file, integratedData, R_cyl, 2.09e-4, 7.14e-3)
+            HV_nums.append(HV_num)
 
-    csvWriter('HV_analytical.csv', nColEdgeFractions, HV_anas)
-    csvWriter('HV_numerical.csv', nColEdgeFractions, HV_nums)
-    csvWriter('HV_ratios.csv', nColEdgeFractions[1:], HV_ratios)
+            Delete(sliced)
+        csvWriter('HV_numerical.csv', nColEdgeFractions, HV_nums)
+
+    # print(HV_anas)
+    # print(HV_nums)
+    # HV_ratios = [ x/y for x,y in zip(HV_nums[1:], HV_anas[1:])]
+    # print(HV_ratios)
+
+    # csvWriter('HV_ratios.csv', nColEdgeFractions[1:], HV_ratios)
 
 if __name__ == "__main__":
     main()
