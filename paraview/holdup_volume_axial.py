@@ -157,7 +157,7 @@ def integrate(object, vars, normalize=None, timeArray=[]):
     nts = len(timeArray) or 1
 
     # GetActiveViewOrCreate('RenderView')
-    print("Integration call")
+    # print("Integration call")
 
     integrated_over_time = []
     for timestep in range(nts):
@@ -167,7 +167,7 @@ def integrate(object, vars, normalize=None, timeArray=[]):
         except IndexError:
             pass
 
-        print("Integration time: ", timestep)
+        print(timestep, end=' | ')
 
         integrated = IntegrateVariables(Input=object)
         intdata = servermanager.Fetch(integrated)
@@ -183,7 +183,7 @@ def integrate(object, vars, normalize=None, timeArray=[]):
             else:
                 print("".join(["Cannot normalize by ", normalize, ". No such CellData!"]))
 
-        print("{key}: {value}".format(key=normalize, value=volume))
+        # print("{key}: {value}".format(key=normalize, value=volume))
 
         integrated_scalars = []
         for var in vars:
@@ -194,6 +194,8 @@ def integrate(object, vars, normalize=None, timeArray=[]):
         integrated_over_time.append(integrated_scalars)
 
         Delete(integrated)
+
+    print("")
 
     return integrated_over_time
 
@@ -269,6 +271,8 @@ def main():
 
     scalars = args['scalars']
 
+    assert(len(scalars) == 1)
+
     #######
 
     view = GetActiveViewOrCreate('RenderView')
@@ -290,7 +294,7 @@ def main():
     if args['analytical']:
         for cut_fraction in nColEdgeFractions[1:]:
 
-            # print("Cut Fraction:", cut_fraction)
+            print("--> Cut Fraction:", cut_fraction)
 
             SetActiveSource(reader)
             clipped = project(reader, { 'project': ['clip', 'Plane', cut_fraction, '+z'] })
@@ -315,6 +319,7 @@ def main():
     ## NOTE: This is only accurate if we have the full mesh including beads.
     if args['numerical']:
         for cut_fraction in nColEdgeFractions[1:]:
+            print("--> Cut Fraction:", cut_fraction)
 
             SetActiveSource(reader)
             sliced  = project(reader, { 'project': ['slice', 'Plane', cut_fraction, '+z'] })
