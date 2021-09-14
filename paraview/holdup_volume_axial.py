@@ -299,7 +299,7 @@ def main():
         HV_ana = ana_holdup_vol(volume_int, volume_beads)
         HV_anas.append(HV_ana)
 
-        integratedData = integrate(sliced, scalars, normalize='Area', timeArray=timesteps_from_file)
+        integratedData = integrate(sliced, scalars, normalize='Area', timeArray=timeArray)
         integratedData = [ y for x in integratedData for y in x ]
 
         HV_num = num_holdup_vol(timesteps_from_file, integratedData, R_cyl, 2.09e-4, 7.14e-3)
@@ -311,9 +311,12 @@ def main():
 
     print(HV_anas)
     print(HV_nums)
+    HV_ratios = [ x/y for x,y in zip(HV_nums, HV_anas)]
+    print(HV_ratios)
 
     csvWriter('HV_analytical.csv', nColEdgeFractions, HV_anas)
     csvWriter('HV_numerical.csv', nColEdgeFractions, HV_nums)
+    csvWriter('HV_ratios.csv', nColEdgeFractions, HV_ratios)
 
 if __name__ == "__main__":
     main()
