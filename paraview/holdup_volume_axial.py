@@ -11,6 +11,8 @@ import math
 import argparse
 import os
 from paraview.simple import *
+from vtkmodules.numpy_interface import dataset_adapter as dsa
+import vtk.util.numpy_support as ns #type:ignore
 
 def default_origin_normal(reader, origin, normal):
     """
@@ -257,7 +259,7 @@ def main():
     R_cyl = ((xmax - xmin) + (ymax - ymin))/ 4
     length_full = zmax - zmin
 
-    cut_fraction = 0.5
+    cut_fraction = 0.1
 
     clipped = project(reader, { 'project': ['clip', 'Plane', cut_fraction, '+z'] })
     sliced  = project(reader, { 'project': ['slice', 'Plane', cut_fraction, '+z'] })
@@ -274,6 +276,10 @@ def main():
     HV_ana = ana_holdup_vol(volume_int, volume_beads)
 
     integratedData = integrate(sliced, scalars, normalize='Area', timeArray=timeArray)
+    integratedData = [ y for x in integratedData for y in x ]
+
+    print(integratedData)
+    print(timeArray)
 
     HV_num = num_holdup_vol(timeArray, integratedData, R_cyl, 2.09e-4, 7.14e-3)
 
