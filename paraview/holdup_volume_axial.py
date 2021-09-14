@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env pvpython
 
 """
 Script to calculate holdup volumes at different axial lengths of a given column.
@@ -8,6 +8,9 @@ Assumes input to be concentrations in only the interstitial region.
 
 # import numpy as np
 import math
+import argparse
+import os
+from paraview.simple import *
 
 def ana_holdup_vol(v_i, v_b):
     """
@@ -208,8 +211,8 @@ def main():
 
     HV_num = num_holdup_vol(timeArray, integratedData, R_cyl, 2.09e-4, 7.14e-3)
 
-    print(f"{HV_ana =}")
-    print(f"{HV_num =}")
+    print("HV_ana =", HV_ana)
+    print("HV_num =", HV_num)
 
 if __name__ == "__main__":
     main()
