@@ -33,9 +33,9 @@ function preclean()
 function builder()
 {
     
-    # ## GCC10 hack
-    # export FCFLAGS="-w -fallow-argument-mismatch -O2"
-    # export FFLAGS="-w -fallow-argument-mismatch -O2"
+    ## GCC10 hack
+    export FCFLAGS="-w -fallow-argument-mismatch -fcray-pointer -O2"
+    export FFLAGS="-w -fallow-argument-mismatch  -fcray-pointer -O2"
 
     pkgdir="$1"
     extraargs="$2"
@@ -114,10 +114,10 @@ function pull_rebase()
 
 function pull_latest_all()
 {
-    pull_rebase "$ewddir" "develop"
-    pull_rebase "$mathlibdir" "master"
-    pull_rebase "$sparskitdir" "master"
-    pull_rebase "$xnsdir" "develop"
+    pull_rebase "$ewddir" "main"
+    pull_rebase "$mathlibdir" "main"
+    pull_rebase "$sparskitdir" "main"
+    pull_rebase "$xnsdir" "main"
 }
 
 buildtype="Debug"
