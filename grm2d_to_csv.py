@@ -49,6 +49,7 @@ def main():
     ap.add_argument("-r", "--radsnap", nargs=3, type=int, help="[its, icol, iscalar] radial snapshot")
     ap.add_argument("--timeloop", action='store_true', help="write out conc_time data for each col_rad_scalar")
     ap.add_argument("--colloop", action='store_true', help="write out conc_col data for each time_rad_scalar")
+    ap.add_argument("--radloop", action='store_true', help="write out conc_rad data for each time_col_scalar")
     args = vars(ap.parse_args())
 
     data = []
@@ -76,6 +77,12 @@ def main():
             for irad in range(nrad):
                 for iscalar in range(nscalar):
                     csvWriter("colloop_{}_{}_{}.csv".format(its, irad, iscalar),data[its,:,irad,iscalar])
+    elif args['radloop']:
+        for its in range(nts):
+            for icol in range(ncol):
+                for iscalar in range(nscalar):
+                    csvWriter("radloop_{}_{}_{}.csv".format(its, icol, iscalar),data[its,icol,:,iscalar])
+
 
     if args['timesnap']:
         icol = args['timesnap'][0]
