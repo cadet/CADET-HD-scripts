@@ -2,10 +2,15 @@
 
 """
 MicroCT image analysis on collections of images
+@task: Average over multiple slices
+@task: is it possible that the variation is experimental systematic error due to light dissipating in the medium?
+@task: xns brinkman simulations with radial porosity profile
 """
 
+
 import matplotlib.pyplot as plt
-from skimage.filters import threshold_mean
+from skimage.filters import threshold_mean, threshold_yen, threshold_otsu
+from skimage.morphology import binary_dilation, binary_erosion
 from skimage import io
 import numpy as np
 import argparse
@@ -46,12 +51,20 @@ def die():
     import sys
     sys.exit()
 
-def driver(img, half_width, filename='output'):
+def driver(img, half_width, threshold='mean',  filename='output'):
     """
     Calculate porosity profile for a single image
     """
 
-    threshold = threshold_mean(img)
+    if threshold == 'mean':
+        threshold = threshold_mean(img)
+    elif threshold == 'otsu':
+        threshold = threshold_otsu(img)
+    elif threshold == 'yen':
+        threshold = threshold_yen(img)
+    else:
+        threshold = float(threshold)
+
     print(f"{threshold=}")
     binary = img > threshold
 
@@ -68,7 +81,13 @@ def driver(img, half_width, filename='output'):
     print(arr.shape)
     # print(arr[0][0])
 
-    # plot_image(arr)
+    dilation1 = binary_dilation(binary)
+    erosion1 = binary_erosion(dilation1)
+    erosion2 = binary_erosion(erosion1)
+    dilation2 = binary_dilation(erosion2)
+
+    plot_image(binary, filename=filename + '_binary.pdf')
+    plot_image(dilation2, filename=filename + '_cleaned.pdf')
 
     ## Find limits and center of the column.
     yw,xw = np.where(arr >= threshold) ## Find bright pixels -> beads
@@ -104,6 +123,8 @@ def driver(img, half_width, filename='output'):
     out_rad = []
     out_por = []
 
+    out_rad_por_tups = []
+
     zarr = np.zeros((arr.shape[0], arr.shape[1]))
 
     for r in range(half_width,rad-half_width,2*half_width):
@@ -120,8 +141,15 @@ def driver(img, half_width, filename='output'):
         # ## Turns out, yes, but very few to actually matter
         # zarr[mask] = zarr[mask] + 1
 
-        out_rad.append(r)
-        out_por.append(pores/total)
+        # out_rad.append(r)
+        # out_por.append(pores/total)
+        out_rad_por_tups.append((r,pores/total))
+
+    out_por_avg = np.average(out_por)
+
+    eps = 1e-3
+    out_rad_por_tups = [ tup for tup in out_rad_por_tups if tup[0] > 50 and tup[1] < 1-eps ]
+    por_avg = sum(map(lambda x: x[1], out_rad_por_tups)) / len(out_rad_por_tups)
 
     ## Plotting
     # fig = plt.figure()
@@ -139,16 +167,28 @@ def driver(img, half_width, filename='output'):
     # pores = np.where(arr[fulldiskmask] < threshold)[0].size ## count number of dark pixels -> voids
     # print("Average porosity of current slice: {avg}".format(avg=pores/total))
 
-    with open(filename + '_rad_por.csv', 'w') as f:
+    with open (filename + '_rad_por_tups.csv', 'w') as f:
         writer = csv.writer(f, delimiter=',')
-        writer.writerows(zip(out_rad, out_por))
+        writer.writerows(out_rad_por_tups)
 
+    with open (filename + '_rad_por_avg.csv', 'w') as f:
+        writer = csv.writer(f, delimiter=',')
+
+        ## Average including "bad" areas
+        # writer.writerow((out_rad[0], out_por_avg))
+        # writer.writerow((out_rad[-1], out_por_avg))
+
+        ## Average after snipping "bad" areas
+        writer.writerow((0, por_avg))
+        writer.writerow((rad, por_avg))
 
 def main():
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("-w", "--width", type=int, default=1, help="Half width of the sampling ring in pixels.")
-    ap.add_argument("FILES", nargs='*', help="Image files to process.")
+    ap.add_argument('-w', '--width', type=int, default=1, help='Half width of the sampling ring in pixels.')
+    ap.add_argument('-t', '--threshold', default='mean', help='Thresholding function or value')
+    # ap.add_argument('-a', '--average', action='store_true', help="Create an average plot over multiple files.")
+    ap.add_argument('FILES', nargs='*', help='Image files to process.')
     args = vars(ap.parse_args())
 
     half_width    = args['width']     ## Half ring-width to count pixels at a given radius
@@ -160,7 +200,7 @@ def main():
 
     ## NOTE: Can parallelize
     for i in range(num_files):
-        driver( arr[i,:,:], args['width'], filename='output_{:04d}'.format(i) )
+        driver( arr[i,:,:], args['width'], args['threshold'], filename='output_{:04d}'.format(i) )
 
 if __name__ == "__main__":
     main()
