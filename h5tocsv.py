@@ -82,6 +82,7 @@ for f in args['files']:
 
             dx_column = sim.root.input.model[unit].discretization.ncol
 
+            print(varstring)
             print("Shape of Y: {shape}".format(shape=y.shape))
             print("Time | Axial | Particle | ...")
 
@@ -96,6 +97,6 @@ for f in args['files']:
 
             print(y)
 
-            with open(f + '.' + varstring.replace('/', '_') +'.csv', 'w') as fd:
+            with open(f + '.integrated.' + varstring.replace('/', '_') +'.csv', 'w') as fd:
                 writer = csv.writer(fd, delimiter=',')
                 writer.writerows(zip(x, y))

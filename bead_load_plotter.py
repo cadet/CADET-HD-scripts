@@ -120,5 +120,5 @@ with plt.style.context(['science']):
     if args['ylims']:
         plt.ylim(args['ylims'])
     if args['output']:
-        fig.savefig(args['output'])
+        fig.savefig(args['output'], dpi=300)
     plt.show()

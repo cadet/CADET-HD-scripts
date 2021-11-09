@@ -7,9 +7,6 @@
 exec > >(tee "$HOME/xnsc.log") 2>&1
 set -euo pipefail
 
-# TODO: git pull the latest version. Some are develop, others are master.
-
-
 [[ -z "$XNS_DEV_ROOT" ]] && echo "No dev root specified. Please set XNS_DEV_ROOT" && exit
 
 # basedir="$HOME/dev"
@@ -122,7 +119,8 @@ function pull_latest_all()
 
 buildtype="Debug"
 installprefix="$HOME/local/simulation/"
-extraargs=""
+# extraargs=""
+extraargs=" -DMKL=OFF -DMKL_PARALLEL=OFF"
 mpi="ON"
 compiler="gnu"
 build_deps="ON"
