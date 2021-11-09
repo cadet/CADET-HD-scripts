@@ -257,6 +257,8 @@ def geometry_snapshot(reader, args):
     connectivityDisplay.Representation = args['display_representation']
     view.OrientationAxesVisibility = int(axisVisible)
 
+    nord10 = [94, 129, 172]
+    color_rgb = [ x/255 for x in nord10]
 
     Hide(connectivity, view)
 
@@ -275,8 +277,11 @@ def geometry_snapshot(reader, args):
     thresholdDisplay = Show(threshold, view)
     ColorBy(thresholdDisplay, None)
     # threshold.UpdatePipeline()
-    thresholdDisplay.AmbientColor = [2/255, 61/255, 107/255]
-    thresholdDisplay.DiffuseColor = [2/255, 61/255, 107/255]
+    thresholdDisplay.AmbientColor = color_rgb
+    thresholdDisplay.DiffuseColor = color_rgb
+
+    # thresholdDisplay.AmbientColor = [2/255, 61/255, 107/255]
+    # thresholdDisplay.DiffuseColor = [2/255, 61/255, 107/255]
 
     print("Processing Column.")
     threshold = Threshold(Input=connectivity)
