@@ -100,7 +100,14 @@ def np2native(obj):
         return obj.decode('utf-8')
     if isinstance(obj, np.bytes_):
         return obj.tobytes().decode('utf-8')
-    elif isinstance(obj, np.generic) or isinstance(obj,np.ndarray):
+    elif isinstance(obj,np.ndarray):
+        if any(isinstance(x, bytes) for x in obj):
+            return [ x.decode('utf-8') for x in obj ]
+        elif any(isinstance(x, np.bytes_) for x in obj):
+            return [ x.tobytes().decode('utf-8') for x in obj ]
+        else:
+            return obj.tolist()
+    elif isinstance(obj, np.generic):
         return obj.tolist()
     else:
         return obj
