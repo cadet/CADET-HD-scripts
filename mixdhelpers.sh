@@ -124,15 +124,15 @@ findup() {
     # findpath="$1"
     # shift 1
 
-    findpath='.'
+    findpath="$PWD"
 
     while [[ $findpath != "/" ]];
     do
         out=$(find "$findpath" "$@" | head -n 1)
-        [ -n "$out" ] && echo "$out" && exit
+        [ -n "$out" ] && echo "$out" && return
 
         # Note: if you want to ignore symlinks, use "$(realpath -s "$findpath"/..)"
-        path="$(readlink -f "$findpath"/..)"
+        findpath="$(readlink -f "$findpath"/..)"
     done
 
 }
