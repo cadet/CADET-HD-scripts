@@ -121,18 +121,18 @@ findup() {
     # USAGE: findup -iname "*minf*" -type f 
     # USAGE: findup -iname "mesh" -type d 
 
-    # path="$1"
+    # findpath="$1"
     # shift 1
 
-    path='.'
+    findpath='.'
 
-    while [[ $path != "/" ]];
+    while [[ $findpath != "/" ]];
     do
-        out=$(find "$path" "$@" | head -n 1)
+        out=$(find "$findpath" "$@" | head -n 1)
         [ -n "$out" ] && echo "$out" && exit
 
-        # Note: if you want to ignore symlinks, use "$(realpath -s "$path"/..)"
-        path="$(readlink -f "$path"/..)"
+        # Note: if you want to ignore symlinks, use "$(realpath -s "$findpath"/..)"
+        path="$(readlink -f "$findpath"/..)"
     done
 
 }
