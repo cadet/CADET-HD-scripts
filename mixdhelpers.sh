@@ -11,19 +11,17 @@ INTSIZE=4
 NSD=3
 
 function die(){
-    echo "ERROR: $@"
+    echo "ERROR: $*"
     return
 }
 
 function get_filesize(){
-    [[ -f "$1" ]] && stat --printf="%s" $1 || die "$1: Not a file!"
+    [[ -f "$1" ]] && stat --printf="%s" "$1" || die "$1: Not a file!"
 }
 
 function get_nrec() {
     MESHDIR=$PWD
     NDF=1
-
-    ALL_ARGS="$@"
 
     POSITIONAL=()
     while [[ $# -gt 0 ]]
@@ -66,11 +64,15 @@ function get_nrec() {
     mien=$(find "$MESHDIR" -iname "*mien*" -type f | head -n 1)
     mxyz=$(find "$MESHDIR" -iname "*mxyz*" -type f | head -n 1)
 
+    [ ! -f "$minf" ] && die "minf: not a file!"
+    [ ! -f "$mien" ] && die "mien: not a file!"
+    [ ! -f "$mxyz" ] && die "mxyz: not a file!"
+
     DATAFILE="$1"
 
     FILESIZE=$(get_filesize "$DATAFILE")
 
-    NN=$(get_nn $ALL_ARGS)
+    NN=$(get_nn "$mxyz")
 
     NREC=$(( $FILESIZE / ( $NN * $NDF * $DOUBLESIZE) ))
     echo "$NREC"
@@ -79,38 +81,11 @@ function get_nrec() {
 
 function get_nn(){
 
-    MESHDIR=$PWD
-    ALL_ARGS="$@"
+    # MESHDIR=$1
+    # mxyz=$(find "$MESHDIR" -iname "*mxyz*" -type f | head -n 1)
+    # [ ! -f "$mxyz" ] && die 
 
-    POSITIONAL=()
-    while [[ $# -gt 0 ]]
-    do
-        key="$1"
-
-        case $key in
-            -m|--meshdir)
-                MESHDIR="$2"
-                shift # past value
-                shift # past value
-                ;;
-            -tet|--tet)
-                NEN=4
-                shift # past value
-                ;;
-            --nsd)
-                NSD="$2"
-                shift # past value
-                shift # past value
-                ;;
-            *)    # unknown option
-                POSITIONAL+=("$1") # save it in an array for later
-                shift # past argument
-                ;;
-        esac
-    done
-    set -- "${POSITIONAL[@]}" # restore positional parameters
-
-    mxyz=$(find "$MESHDIR" -iname "*mxyz*" -type f | head -n 1)
+    mxyz="$1"
 
     NN=$(( $(get_filesize "$mxyz") / ( $NSD * $DOUBLESIZE ) ))
     echo "$NN"
@@ -156,8 +131,8 @@ mapflow_v2(){
     CWD=${PWD}
     MESHDIR_MASS="$(findup -type d -iname mesh)/mass"
     MESHDIR_FLOW="$(findup -type d -iname mesh)/flow"
-    cd "$MESHDIR_MASS"
-    mapflow -tet "$MESHDIR_FLOW" $(readlink -f "$CWD/..")
-    cd "$CWD"
+    cd "$MESHDIR_MASS" || die "CD issues!"
+    mapflow -tet "$MESHDIR_FLOW" "$(readlink -f "$CWD/..")"
+    cd "$CWD" || die "CD issues!"
     mv "$MESHDIR_MASS/flowfield" ..
 }
