@@ -587,7 +587,7 @@ def main():
         integrated_over_time = integrate(reader, args['scalars'], normalize=args['integrate'], timeArray=timeArray)
         print(integrated_over_time)
         for scalar in scalars:
-            csvWriter("{s}.integrated.cg".format(s=scalar), timeArray, np.array(integrated_over_time).T[list(scalars).index(scalar)])
+            csvWriter("{s}.integrated.{n}.csv".format(s=scalar, n=args['integrate']), timeArray, np.array(integrated_over_time).T[list(scalars).index(scalar)])
 
 
     ## NOTE: Pipeline operations below [EXPERIMENTAL]
