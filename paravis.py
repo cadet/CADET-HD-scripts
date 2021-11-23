@@ -281,6 +281,8 @@ def integrate(object, vars, normalize=None, timeArray=[]):
 
     # GetActiveViewOrCreate('RenderView')
 
+    VolumeOrArea = []
+
     integrated_over_time = []
     for timestep in range(nts):
         try:
@@ -288,6 +290,8 @@ def integrate(object, vars, normalize=None, timeArray=[]):
             object.UpdatePipeline(timeArray[timestep])
         except IndexError:
             pass
+
+        print(f"Integrating timestep: {timestep}")
 
         integrated = IntegrateVariables(Input=object)
         intdata = servermanager.Fetch(integrated)
@@ -304,6 +308,8 @@ def integrate(object, vars, normalize=None, timeArray=[]):
                 print("".join(["Cannot normalize by ", normalize, ". No such CellData!"]))
 
         # print("{key}: {value}".format(key=normalize, value=volume))
+        # VolumeOrArea.append(volume)
+        # print(VolumeOrArea)
 
         integrated_scalars = []
         for var in vars:
@@ -407,6 +413,9 @@ def main():
     ap.add_argument("-cg", "--chromatogram", choices=['Volume', 'Area'], help="Chromatogram: Integrate (0,0,1) surface of given volume or Integrate given area")
     ap.add_argument("-scg", "--shell-chromatograms", type=int, help="Calculate chromatograms in n shell sections of given SURFACE")
     ap.add_argument("--grm-2d", nargs=2, type=int, help="Split into axial and radial sections and integrate scalars for fitting with 2D GRM. args: <ncol> <nrad>")
+
+    ap.add_argument("--integrate", choices=['Volume', 'Area', 'None'], help="Integrate and average the given Volume/Area")
+
 
     ap.add_argument("--project", nargs=4, default=['clip', 'Plane', 0.5, "x"], help="Projection. <clip|slice> <Plane|Cylinder..> <origin> <x|y|z>" )
     ap.add_argument("--pipeline", nargs='+', help="Operations to be performed in pipe" )
@@ -574,6 +583,11 @@ def main():
 
     elif args['grm_2d']:
         GRM2D(reader, args)
+    elif args['integrate']:
+        integrated_over_time = integrate(reader, args['scalars'], normalize=args['integrate'], timeArray=timeArray)
+        print(integrated_over_time)
+        for scalar in scalars:
+            csvWriter("{s}.integrated.cg".format(s=scalar), timeArray, np.array(integrated_over_time).T[list(scalars).index(scalar)])
 
 
     ## NOTE: Pipeline operations below [EXPERIMENTAL]
