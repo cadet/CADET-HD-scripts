@@ -63,50 +63,28 @@ def num_holdup_vol(t, c, R, u, cin):
 
 ap = argparse.ArgumentParser()
 ap.add_argument("files", nargs='*', help="files to plot")
-ap.add_argument("-t", "--title", required=False, default="Chromatogram",
-        help="title")
-ap.add_argument("-x", "--xlabel", required=False, default="Time",
-        help="xlabel")
-ap.add_argument("-y", "--ylabel", required=False, default="Concentration",
-        help="ylabel")
-ap.add_argument("-l", "--labels", required=False, nargs='*',
-        help="legend labels")
-ap.add_argument("-ls", "--linestyles", required=False, nargs='*',
-        help="linestyles = solid dashed ...")
-ap.add_argument("-lw", "--linewidths", required=False, nargs='*',
-        help="linewidth = 0.1 2 ...")
-ap.add_argument("-m", "--markers", required=False, nargs='*',
-        help="markers = s, o, ...")
-ap.add_argument("-c", "--colors", required=False, nargs='*',
-        help="color indices from 1-7 for each line.")
-ap.add_argument("-xl", "--xlims", required=False,nargs=2, type=float,
-        help="x axis limits")
-ap.add_argument("-yl", "--ylims", required=False,nargs=2, type=float,
-        help="y axis limits")
-ap.add_argument("-f", "--fill", required=False, action='store_true',
-        help="fill area under curve")
-ap.add_argument("-n", "--normalize", required=False,
-        help="normalize y data to the provided reference value or last datapoint ('self')")
-ap.add_argument("-nl", "--no-legend", required=False, action='store_true',
-        help="don't show legend")
-ap.add_argument("--legend", required=False, nargs=3, default=['upper center', '0.5', '-0.2'], type=str,
-        help="Legend settings: --legend <location> <bbox_to_anchor>")
-ap.add_argument("--legend-size", required=False, default='medium',
-        help="Legend font size:int or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}")
-ap.add_argument("--legend-ncol", required=False, default=1, type=int,
-        help="Number of columns in legend")
-ap.add_argument("-o", "--output", required=False,
-        help="output file")
-ap.add_argument("-s", "--show", required=False, action='store_true',
-        help="output file")
-ap.add_argument("-r", "--rescale", type=float, required=False,
-        help="Rescale graph with multiplicative factor (1/holdup-ratio)")
-ap.add_argument("-rv", "--rescale-variant", type=float, required=False,
-        help="Rescale graph based on y value with multiplicative factor (1/holdup-ratio)")
-ap.add_argument("-sr", "--save-rescaled", required=False,
-        help="File to save rescaled data")
-ap.add_argument("-hv", "--holdup-volume", required=False, nargs = 3, type=float,
-        help="Calculate holdup volume with R, u, cin")
+ap.add_argument("-t", "--title", default="Chromatogram", help="title")
+ap.add_argument("-x", "--xlabel", default="Time", help="xlabel")
+ap.add_argument("-y", "--ylabel", default="Concentration", help="ylabel")
+ap.add_argument("-l", "--labels", nargs='*', help="legend labels")
+ap.add_argument("-ls", "--linestyles", nargs='*', help="linestyles = solid dashed ...")
+ap.add_argument("-lw", "--linewidths", nargs='*', help="linewidth = 0.1 2 ...")
+ap.add_argument("-m", "--markers", nargs='*', help="markers = s, o, ...")
+ap.add_argument("-c", "--colors", nargs='*', help="color indices from 1-7 for each line.")
+ap.add_argument("-xl", "--xlims", nargs=2, type=float, help="x axis limits")
+ap.add_argument("-yl", "--ylims", nargs=2, type=float, help="y axis limits")
+ap.add_argument("-f", "--fill", action='store_true', help="fill area under curve")
+ap.add_argument("-n", "--normalize", help="normalize y data to the provided reference value or last datapoint ('self')")
+ap.add_argument("-nl", "--no-legend", action='store_true', help="don't show legend")
+ap.add_argument("--legend", nargs=3, default=['upper center', '0.5', '-0.2'], type=str, help="Legend settings: --legend <location> <bbox_to_anchor>")
+ap.add_argument("--legend-size", default='medium', help="Legend font size:int or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}")
+ap.add_argument("--legend-ncol", default=1, type=int, help="Number of columns in legend")
+ap.add_argument("-o", "--output", help="output file")
+ap.add_argument("-s", "--show", action='store_true', help="output file")
+ap.add_argument("-r", "--rescale", type=float, help="Rescale graph with multiplicative factor (1/holdup-ratio)")
+ap.add_argument("-rv", "--rescale-variant", type=float, help="Rescale graph based on y value with multiplicative factor (1/holdup-ratio)")
+ap.add_argument("-w", "--write", help="Write the CSV file (after applying rescaling if any)")
+ap.add_argument("-hv", "--holdup-volume", nargs = 3, type=float, help="Calculate holdup volume with R, u, cin")
 
 # ap.add_argument("--csv", required=False, action='store_true',
 #         help="input is csv file instead of default space separated")
@@ -199,10 +177,10 @@ with plt.style.context(['science']):
         plt.show()
 
 
-    if args['save_rescaled']:
+    if args['write']:
         import csv
         for filename,x,y in zip(args['files'], xs, ys):
-            with open(filename+'-' + args['save_rescaled'], 'w') as f:
+            with open(args['write'], 'w') as f:
                 writer = csv.writer(f, delimiter=',')
                 writer.writerows(zip(x, y))
 
