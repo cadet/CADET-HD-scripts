@@ -48,6 +48,8 @@ from subprocess import run
 from cadet import Cadet
 from addict import Dict
 
+ENCODING = 'ascii'
+
 ap = argparse.ArgumentParser(description='Convert between yaml and hdf5')
 ap.add_argument("-o", "--output", help="Output filename")
 ap.add_argument("-u", "--update", action='store_true', help="Update existing h5 file")
@@ -97,14 +99,14 @@ def np2native(obj):
     Convert from numpy types to python native types
     """
     if isinstance(obj, bytes):
-        return obj.decode('utf-8')
+        return obj.decode(ENCODING)
     if isinstance(obj, np.bytes_):
-        return obj.tobytes().decode('utf-8')
+        return obj.tobytes().decode(ENCODING)
     elif isinstance(obj,np.ndarray):
         if any(isinstance(x, bytes) for x in obj):
-            return [ x.decode('utf-8') for x in obj ]
+            return [ x.decode(ENCODING) for x in obj ]
         elif any(isinstance(x, np.bytes_) for x in obj):
-            return [ x.tobytes().decode('utf-8') for x in obj ]
+            return [ x.tobytes().decode(ENCODING) for x in obj ]
         else:
             return obj.tolist()
     elif isinstance(obj, np.generic):
