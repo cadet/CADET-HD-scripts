@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
     YAML2HDF
@@ -114,14 +114,20 @@ def np2native(obj):
     else:
         return obj
 
-def load_file(fname):
+def load_file(fname, key=''):
     ext = Path(fname).suffix
     config = {}
     if ext == ".h5":
         config = load_h5(fname)
     elif ext == ".yaml" or ext == ".yml" :
-        with open(fname) as inputfile:
-            config = yaml.load(inputfile, Loader=yaml.FullLoader)
+        with open(fname, 'r') as inputfile:
+            config = yaml.safe_load(inputfile)
+
+    if key == 'input':
+        config = delete_key(config, 'output')
+    elif key == 'output':
+        config = delete_key(config, 'input')
+
     return config
 
 def save_file(config, fname, update=False):
@@ -177,20 +183,19 @@ if args['diff']:
     ## Diff ANY two files (even h5 vs yaml)
     ## Only prints changes
 
-    config1 = load_file(args['diff'][0])
-    config2 = load_file(args['diff'][1])
+    config1 = load_file(args['diff'][0], args['key'])
+    config2 = load_file(args['diff'][1], args['key'])
 
     pprint(DeepDiff(config1, config2), indent=2)
 
 elif args['edit']:
-    ## TODO: Make this faster for files with large outputs: 2D files
-    config = load_file(args['edit'])
+    config = load_file(args['edit'], key='input')
     with tempfile.NamedTemporaryFile("w+") as tmpf:
         yaml.dump(config, tmpf)
         tmpf.seek(0)
         run([str(os.getenv('EDITOR')), tmpf.name])
-        config = yaml.load(tmpf, Loader=yaml.FullLoader)
-    save_file(config, args['edit'])
+        config = yaml.safe_load(tmpf)
+    save_file(config, args['edit'], update=True)
 
 elif args['files']:
     config = {}
