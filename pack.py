@@ -11,13 +11,14 @@
 
 @NOTE: Doesn't work with porosity-controlled genmesh output meshes yet!!.
 @NOTE: porosity is calculated for the cylinder length provided, not for void spaces yet
+@NOTE: In this script, we only deal with radial variation, so other multiplexes (see cadet 2DGRM doc) are ignored
 """
-
-# [NOTE]: In this script, we only deal with radial variation, so other multiplexes are ignored
 
 # TODO: Handle rho == eta edge cases
 # TODO: Auto handle scaling_factor: (Updatebounds, scale to fit Cyl Radius = 5)
 # TODO: Better parallelization?
+
+# TODO: Write output plots as pdf: 1. Histogram, 2. Radial porosity profile
 
 import sys
 import struct
@@ -25,7 +26,6 @@ import itertools
 import numpy as np
 import argparse
 from matplotlib import pyplot as plt
-import matplotlib
 from math import asin,sqrt,pi
 from mpmath import ellipk, ellipe, ellipf, nstr
 from multiprocessing import Pool
@@ -193,13 +193,13 @@ def histo(radii, **kwargs):
 
     if filename:
         with plt.style.context(['science']):
-            matplotlib.rcParams['font.sans-serif'] = "Verdana"
-            matplotlib.rcParams['font.family'] = "sans-serif"
+            # matplotlib.rcParams['font.sans-serif'] = "Verdana"
+            # matplotlib.rcParams['font.family'] = "sans-serif"
 
             fig, ax = plt.subplots()
             ax.hist(radii, bins=bins)
 
-            ax.set(title=filename)
+            # ax.set(title=filename)
             ax.set_xlabel('Bead Radius ($m$)')
             ax.set(ylabel='Frequency')
             fig.savefig(filename + '.pdf')
@@ -284,6 +284,7 @@ def main():
     ap.add_argument("-e", "--endianness", help="> or <", default='<')
 
     ap.add_argument("-d", "--dry-run", help="Do not calculate vol_frac, porosities and mean_radii", action='store_true')
+    ap.add_argument("-o", "--output-prefix", help="prefix to output for radial porosity plot and PSD histogram", required=True)
 
     args = vars(ap.parse_args())
 
@@ -389,7 +390,7 @@ def main():
     if args['dry_run']:
         sys.exit(0)
 
-    volFrac, bin_radii = histo([bead.r for bead in fullBed.beads], filename='psdtotal', bins=args['npartype'])
+    volFrac, bin_radii = histo([bead.r for bead in fullBed.beads], filename=args['output_prefix'] + '_psd', bins=args['npartype'])
 
     # If bins is an int, it defines the number of equal-width bins in the given range
     # (10, by default). If bins is a sequence, it defines a monotonically increasing
@@ -436,17 +437,21 @@ def main():
     total_beads_volume_per_shell = np.array(total_beads_volume_per_shell).astype(np.float64)
     radii_beads_per_shell = [ np.array(item).astype(np.float64) for item in radii_beads_per_shell ]
 
-    volCylRegions = [pi * hBed * (rShells[i+1]**2 - rShells[i]**2) for i in range(nRegions)]
-    porosities = [ float(1-n/m) for n,m in zip(total_beads_volume_per_shell, volCylRegions) ]
+    volCylRegions_bed = [pi * hBed * (rShells[i+1]**2 - rShells[i]**2) for i in range(nRegions)]
+    volCylRegions_column = [pi * h * (rShells[i+1]**2 - rShells[i]**2) for i in range(nRegions)]
+
+    porosities_bed = [ float(1-n/m) for n,m in zip(total_beads_volume_per_shell, volCylRegions_bed) ]
+    porosities_column = [ float(1-n/m) for n,m in zip(total_beads_volume_per_shell, volCylRegions_column) ]
+
     avg_shell_radii = [ (rShells[i] + rShells[i+1])/2 for i in range(nRegions) ]
 
-    # for i in range(nRegions):
-    #     print(avg_radius[i], volRegions[i], volCylRegions[i], porosities[i])
-
     print("\n--- Radial Porosity Distribution in Bed ---")
-    print("col_porosity:\n", porosities)
+    print("col_porosity_bed:\n", porosities_bed)
     print("---\n")
 
+    print("\n--- Radial Porosity Distribution in FULL COLUMN ---")
+    print("col_porosity:\n", porosities_column)
+    print("---\n")
 
     ## Get histogram data: volume fractions and radii, for each shell
     ## bin_radii is the list of mean bin radii for each shell, which is set to BINS
@@ -455,7 +460,6 @@ def main():
         volFrac, bin_radii = histo([float(x) for x in rads], bins=BINS)
         volFracs.extend(volFrac)
 
-
     print("\n--- Particle Distribution per Shell ---")
     print("vol_frac length (NRAD * NPARTYPE) =", len(volFracs))
     print("avg_radii length (NPARTYPE) =", len(bin_radii))
@@ -463,8 +467,10 @@ def main():
     print("par_radius = ", bin_radii)
     print("---\n")
 
-    plotter(avg_shell_radii, porosities, '', 'por_rad.pdf')
-    csvWriter('por_rad.csv', avg_shell_radii, porosities)
+    plotter(avg_shell_radii, porosities_bed, '', args['output_prefix'] + '_bedpor_rad.pdf')
+    plotter(avg_shell_radii, porosities_column, '', args['output_prefix'] + '_colpor_rad.pdf')
+    csvWriter(args['output_prefix'] + '_bedpor_rad.csv', avg_shell_radii, porosities_bed)
+    csvWriter(args['output_prefix'] + '_colpor_rad.csv', avg_shell_radii, porosities_column)
 
 def volShellRegion(beads, rShells, i):
     """
