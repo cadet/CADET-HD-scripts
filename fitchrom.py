@@ -12,7 +12,7 @@ import subprocess
 import argparse
 from cadet import Cadet
 
-cadetpath = "/home/jayghoshter/local/bin/cadet-cli"
+cadetpath = subprocess.run(['which', 'cadet-cli'], capture_output=True, text=True ).stdout.strip()
 Cadet.cadet_path = cadetpath
 
 count = 0
@@ -47,8 +47,14 @@ def loadh5(col_dispersion, filename, ref_curve_filename):
     sim.filename = filename
     sim.load()
 
+    x0, y0 = readChromatogram(ref_curve_filename)
+
     ## NOTE: Sets the col_dispersion to UNIT_002
     sim.root.input.model.unit_002.col_dispersion = col_dispersion
+
+    # NOTE: Ensure that section times do not exceed available reference time
+    sim.root.input.solver.sections.section_times = [min(x0), max(x0)]
+    sim.root.input.solver.user_solution_times = x0
 
     sim.save()
     runout = sim.run()
@@ -60,11 +66,6 @@ def loadh5(col_dispersion, filename, ref_curve_filename):
     x = sim.root.output.solution.solution_times
     ## NOTE: Solution is taken from UNIT_003
     y = sim.root.output.solution.unit_003.solution_outlet_comp_000
-
-    x0, y0 = readChromatogram(ref_curve_filename)
-
-    # NOTE: Ensure that section times do not exceed available reference time
-    sim.root.input.solver.sections.section_times = [min(x0), max(x0)]
 
     sse_value = sse(x0,y0, x,y)
     global count
