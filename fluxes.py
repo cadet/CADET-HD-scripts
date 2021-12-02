@@ -8,6 +8,7 @@ import argparse
 import math
 import matplotlib.pyplot as plt 
 
+
 def csvWriter(filename, x, y):
     import csv
     with open(filename, 'w') as f:
@@ -32,11 +33,16 @@ def readChromatogram(data_path):
     return time, conc
 
 def trapz(y, *args, **kwargs):
-     x = kwargs.get('x', range(len(y)))
-     sum = 0.0
-     for i in range(len(x) - 1):
-         sum = sum + 0.5 * (y[i] + y[i+1]) * (x[i+1] - x[i])
-     return sum
+    x = kwargs.get('x', range(len(y)))
+
+    try: 
+        import numpy as np
+        return np.trapz(y, x=x)
+    except ImportError:
+        sum = 0.0
+        for i in range(len(x) - 1):
+            sum = sum + 0.5 * (y[i] + y[i+1]) * (x[i+1] - x[i])
+        return sum
 
 def num_holdup_vol(t, c, R, u, cin):
     import math
@@ -78,6 +84,7 @@ with plt.style.context(['science']):
             fig.savefig(args['output'])
         else:
             plt.show()
+
         csvWriter(f'{filename}_influx.csv', t, influx)
         csvWriter(f'{filename}_outflux.csv', t, outflux)
         csvWriter(f'{filename}_stored.csv', t, stored)
