@@ -17,6 +17,12 @@ Cadet.cadet_path = cadetpath
 
 count = 0
 
+def csvWriter(filename, x, y, mode='w'):
+    import csv
+    with open(filename, mode) as f:
+        writer = csv.writer(f)
+        writer.writerows(zip(x, y))
+
 def readChromatogram(data_path):
     time= []
     conc= []
@@ -71,6 +77,8 @@ def loadh5(col_dispersion, filename, ref_curve_filename):
     global count
     count = count + 1
     print(count, ':', col_dispersion, sse_value)
+
+    csvWriter('fitchrom.csv', col_dispersion, [sse_value], mode='a')
 
     return(sse_value)
 
