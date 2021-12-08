@@ -63,6 +63,7 @@ ap.add_argument("-k", "--key", choices=['input', 'output'], help="Print/write ei
 ap.add_argument("-e", "--edit", help="Edit h5 files in place as html files")
 ap.add_argument("-d", "--diff", nargs=2, help="Diff 2 files. Can diff yaml vs h5 as well.")
 ap.add_argument("--extract", help="Plot using fzf to browse the hdf5")
+ap.add_argument("--serialize", help="Serialize all entries in the file")
 ap.add_argument("files", nargs='*', help="Input files. Will be applied in order")
 args = vars(ap.parse_args())
 
@@ -214,6 +215,16 @@ def deep_get(input_dict, keys, default=None, vartype=None, choices=[]):
 
     return value
 
+def serialize(config:dict):
+    paths = []
+    for key in config:
+        if isinstance(config[key], dict):
+            paths.extend([f"{key}.{x}" for x in serialize(config[key])])
+        else:
+            paths.append(key)
+
+    return paths
+
 
 if args['diff']:
     ## Diff ANY two files (even h5 vs yaml)
@@ -249,6 +260,24 @@ elif args['extract']:
 
     print( '.'.join(pathlist) )
     print(deep_get(config, '.'.join(pathlist)))
+
+elif args['serialize']:
+    """
+    serialize paths in the h5 file
+    allow instant fzf search and multi-select
+    print out and save flattened data 
+    """
+    config = load_file(args['serialize'])
+    paths = serialize(config)
+    fzf = FzfPrompt()
+    FZF_FILE_OPTS = f"--cycle -m --prompt=\"Select path❯ \""
+    selected = fzf.prompt(paths, FZF_FILE_OPTS)
+    for item in selected:
+        value = deep_get(config, item)
+        value = np.array(value).flatten()
+        print(item + ':', value)
+        with open(item, 'w') as fp:
+            fp.write('\n'.join((str(x) for x in value)))
 
 elif args['files']:
     config = {}
