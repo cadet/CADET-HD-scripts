@@ -64,6 +64,7 @@ ap.add_argument("-e", "--edit", help="Edit h5 files in place as html files")
 ap.add_argument("-d", "--diff", nargs=2, help="Diff 2 files. Can diff yaml vs h5 as well.")
 ap.add_argument("--extract", help="Plot using fzf to browse the hdf5")
 ap.add_argument("--serialize", help="Serialize all entries in the file")
+ap.add_argument("--run", action='store_true', help="Save a file and run a simulation")
 ap.add_argument("files", nargs='*', help="Input files. Will be applied in order")
 args = vars(ap.parse_args())
 
@@ -140,10 +141,10 @@ def load_file(fname, key=''):
 def save_file(config, fname, update=False):
     ext = Path(fname).suffix
     if ext == ".h5":
-        save_h5(config, fname, update)
+        out = save_h5(config, fname, update)
     elif ext == ".yaml" or ext == ".yml" :
-        save_yaml(config, fname)
-    return config
+        out = save_yaml(config, fname)
+    return out # type: ignore
 
 def save_yaml(config, fname):
     try:
@@ -152,7 +153,9 @@ def save_yaml(config, fname):
         pass
 
     with open(fname, 'w') as outfile:
-            yaml.dump(config, outfile, default_flow_style=None)
+        yaml.dump(config, outfile, default_flow_style=None)
+
+    return config
 
 def load_h5(fname):
     sim = Cadet()
@@ -161,6 +164,10 @@ def load_h5(fname):
     return(reconstruct(sim.root))
 
 def save_h5(config, fname, update=False):
+
+    cadetpath = run(['which', 'cadet-cli'], capture_output=True, text=True ).stdout.strip()
+    Cadet.cadet_path = cadetpath
+
     sim = Cadet()
     sim.filename = fname
 
@@ -177,6 +184,7 @@ def save_h5(config, fname, update=False):
         pass
 
     sim.save()
+    return sim
 
 def delete_key(config:dict, key:str):
     try:
@@ -294,5 +302,8 @@ elif args['files']:
         print(yaml.dump(config, allow_unicode=True, default_flow_style=None))
     elif args['output']:
         save_file(config, args['output'], update=args['update'])
+    elif args['run']:
+        save_file(config, "_".join(args['files']).replace('.h5','').replace('.yaml', '') + '.h5' ).run()
+
 
 
