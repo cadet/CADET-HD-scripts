@@ -20,6 +20,8 @@ import numpy as np
 import argparse
 import csv
 
+from pathlib import Path
+
 from functools import partial
 from multiprocessing import Pool
 
@@ -263,7 +265,13 @@ def driver(img, half_width, threshold, resolution, filename):
         writer.writerow((rad * resolution, TARGET_POR))
 
 def driver_wrapper(i, img_array, half_width, threshold, resolution, filenames ):
-    return driver(img_array[i], half_width=half_width, threshold=threshold, resolution=resolution, filename=filenames[i] )
+    return driver(
+        img_array[i],
+        half_width=half_width,
+        threshold=threshold,
+        resolution=resolution,
+        filename=str(Path(filenames[i]).name)
+)
 
 def main():
 
