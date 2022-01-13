@@ -264,9 +264,10 @@ def driver(img, half_width, threshold, resolution, filename):
         writer.writerow((0, TARGET_POR))
         writer.writerow((rad * resolution, TARGET_POR))
 
-def driver_wrapper(i, img_array, half_width, threshold, resolution, filenames ):
+def driver_wrapper(i, half_width, threshold, resolution, filenames ):
+    img = io.imread(filenames[i])
     return driver(
-        img_array[i],
+        img,
         half_width=half_width,
         threshold=threshold,
         resolution=resolution,
@@ -287,22 +288,28 @@ def main():
 
     half_width    = args['width']     ## Half ring-width to count pixels at a given radius
 
-    coll = io.collection.ImageCollection(args['FILES'])
-    arr = coll.concatenate()
-    print(arr.shape)
-    num_files = arr.shape[0]
+    if args['nproc'] > 1: 
+        with Pool(args['nproc']) as pool: 
+            pool.map(
+                partial(driver_wrapper, 
+                    half_width=args['width'],
+                    threshold=args['threshold'],
+                    resolution=args['resolution'],
+                    filenames=args['FILES']
+                ),
+                range(len(args['FILES']))
+            )
+    else: 
+        coll = io.collection.ImageCollection(args['FILES'])
+        arr = coll.concatenate()
+        print(arr.shape)
+        num_files = arr.shape[0]
 
-    with Pool(args['nproc']) as pool: 
-        pool.map(
-            partial(driver_wrapper, 
-                img_array=arr, 
-                half_width=args['width'],
-                threshold=args['threshold'],
-                resolution=args['resolution'],
-                filenames=args['FILES']
-            ),
-            range(num_files)
-        )
+        for i in range(num_files):
+            driver(arr[i], args['width'], args['threshold'], args['resolution'], f"{args['FILES'][i]}")
+
+
+        
 
 if __name__ == "__main__":
     main()
