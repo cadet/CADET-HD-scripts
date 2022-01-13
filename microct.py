@@ -20,6 +20,9 @@ import numpy as np
 import argparse
 import csv
 
+from functools import partial
+from multiprocessing import Pool
+
 TARGET_POR=0.37
 
 def plot_image_threshold(img, threshold, binary, filename=None):
@@ -126,7 +129,7 @@ def driver(img, half_width, threshold, resolution, filename):
     print(f"{threshold=}")
     binary = img > threshold
 
-    plot_image(img, filename + '_original.pdf')
+    # plot_image(img, filename + '_original.pdf')
 
     ## arr is used for further operations. If set to img, we can use the threshold
     ## calculated directly on it in later operations.
@@ -232,10 +235,10 @@ def driver(img, half_width, threshold, resolution, filename):
     # pores = np.where(work_arr[fulldiskmask] < work_threshold)[0].size ## count number of dark pixels -> voids
     # print("Average porosity of current slice: {avg}".format(avg=pores/total))
 
-    plot_image_filtered_profile(img, work_arr, out_rad_por_tups, filename + '_comparison.pdf')
-    plot_image(binary, filename + '_binary.pdf')
-    plot_image(work_arr, filename + '_filtered.pdf')
-    plot_profile(out_rad_por_tups, filename)
+    # plot_image_filtered_profile(img, work_arr, out_rad_por_tups, filename + '_comparison.pdf')
+    # plot_image(binary, filename + '_binary.pdf')
+    # plot_image(work_arr, filename + '_filtered.pdf')
+    # plot_profile(out_rad_por_tups, filename)
 
     with open (filename + '_rad_por_tups.csv', 'w') as f:
         writer = csv.writer(f, delimiter=',')
@@ -259,6 +262,9 @@ def driver(img, half_width, threshold, resolution, filename):
         writer.writerow((0, TARGET_POR))
         writer.writerow((rad * resolution, TARGET_POR))
 
+def driver_wrapper(i, img_array, half_width, threshold, resolution, filenames ):
+    return driver(img_array[i], half_width=half_width, threshold=threshold, resolution=resolution, filename=filenames[i] )
+
 def main():
 
     ap = argparse.ArgumentParser()
@@ -266,6 +272,7 @@ def main():
     ap.add_argument('-t', '--threshold', default='mean', help='Thresholding function or value')
     ap.add_argument('-r', '--resolution', type=float, default=2.5e-6, help='Resolution of MicroCT scans')
     ap.add_argument('-o', '--output', default='output', help='Output filename prefix')
+    ap.add_argument('-n', '--nproc', default=4, type=int, help='Output filename prefix')
     # ap.add_argument('-a', '--average', action='store_true', help="Create an average plot over multiple files.")
     ap.add_argument('FILES', nargs='*', help='Image files to process.')
     args = vars(ap.parse_args())
@@ -277,9 +284,17 @@ def main():
     print(arr.shape)
     num_files = arr.shape[0]
 
-    ## NOTE: Can parallelize
-    for i in range(num_files):
-        driver( arr[i,:,:], args['width'], args['threshold'], resolution = args['resolution'], filename=args['output'] + '_{:04d}'.format(i) )
+    with Pool(args['nproc']) as pool: 
+        pool.map(
+            partial(driver_wrapper, 
+                img_array=arr, 
+                half_width=args['width'],
+                threshold=args['threshold'],
+                resolution=args['resolution'],
+                filenames=args['FILES']
+            ),
+            range(num_files)
+        )
 
 if __name__ == "__main__":
     main()
