@@ -87,15 +87,20 @@ else:
 
 
 if args['sort'] == 'z':
-    xyzr = xyzr[xyzr[:,2].argsort()]
-    data = data[:,xyzr[:,2].argsort(),:]
+    ordering = xyzr[:,2].argsort()
+    data = data[:,ordering,:]
+    xyzr = xyzr[ordering]
 elif args['sort'] == 'r':
-    xyzr = xyzr[xyzr[:,3].argsort()]
-    data = data[:,xyzr[:,3].argsort(),:]
+    ordering = xyzr[:,3].argsort()
+    data = data[:,ordering,:]
+    xyzr = xyzr[ordering]
 elif args['sort'] == 'xy':
     x2y2 = np.array([ v[0]**2 + v[1]**2 for v in xyzr ])
-    xyzr = xyzr[x2y2.argsort()]
-    data = data[:,x2y2.argsort(),:]
+    ordering = x2y2.argsort()
+    data = data[:,ordering,:]
+    xyzr = xyzr[ordering]
+
+## TODO: np.graadient to see if the slope is zero yet
 
 with plt.style.context(['science']):
     fig, ax = plt.subplots()
