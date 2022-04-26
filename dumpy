@@ -19,6 +19,7 @@ Alternatives: od (octaldump) to convert from bin->ascii
 
 ## TODO: Test extract_slice on large files (will there be overflows?)
 ## TODO: Print nth column
+## TODO: Try out np.memmap() seen here https://stackoverflow.com/questions/5854515/interactive-large-plot-with-20-million-sample-points-and-gigabytes-of-data
 
 from __future__ import print_function
 
