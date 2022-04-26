@@ -147,13 +147,13 @@ def read_config():
 def setup_dirs():
     reprint("Creating FLOW directory...")
     Path("FLOW/mesh").mkdir(parents=True, exist_ok=True)
-    # shutil.copy(TEMPLATEDIR.joinpath('xns.flow.in'      ), 'FLOW'     )
-    # shutil.copy(TEMPLATEDIR.joinpath('job.flow.sh'      ), 'FLOW'     )
+    shutil.copy(TEMPLATEDIR.joinpath('xns.flow.in'      ), 'FLOW'     )
+    shutil.copy(TEMPLATEDIR.joinpath('job.flow.sh'      ), 'FLOW'     )
 
     reprint("Creating MASS directory...")
     Path("MASS/mesh").mkdir(parents=True, exist_ok=True)
-    # shutil.copy(TEMPLATEDIR.joinpath('xns.mass.in'      ), 'MASS'     )
-    # shutil.copy(TEMPLATEDIR.joinpath('job.mass.sh'      ), 'MASS'     )
+    shutil.copy(TEMPLATEDIR.joinpath('xns.mass.in'      ), 'MASS'     )
+    shutil.copy(TEMPLATEDIR.joinpath('job.mass.sh'      ), 'MASS'     )
 
 def edit_files(FILES:list):
     EDITOR = environ.get('EDITOR','vim')
@@ -164,11 +164,8 @@ def edit_files(FILES:list):
 def set_stage():
     # if environ.get('LMOD_DIR'):
     if 'jureca' in str(environ.get('HOSTNAME')):
-        # module('--force purge')
-        # module('use /usr/local/software/jureca/OtherStages')
-        # module('load ' + STAGE)
-        module('load intel-para Boost flex')
-
+        print("setting stage")
+        module('load GCC/11.2.0 ParaStationMPI/5.5.0-1 ParMETIS/4.0.3-double Boost/1.78.0')
 
 def transform_mixd():
     run_command('shiftmixd ' + ETYPE +  config['shift'])
@@ -237,8 +234,8 @@ def partition_flow():
     chdir('FLOW/mesh/')
 
     if config['partition'] == 'yes':
-        run_command('gendual -e ' + ETYPE)
-        run_command('genneim --nen ' + NEN)
+        run_command_in_shell('gendual -e ' + ETYPE)
+        run_command_in_shell('genneim --nen ' + NEN)
     else:
         reprint("Not partitioning mesh")
 
@@ -271,8 +268,8 @@ def partition_mass():
     chdir('MASS/mesh/')
 
     if config['partition'] == 'yes':
-        run_command('gendual -e ' + ETYPE)
-        run_command('genneim --nen ' + NEN + '-s')
+        run_command_in_shell('gendual -e ' + ETYPE)
+        run_command_in_shell('genneim --nen ' + NEN + '-s')
     else:
         reprint("Not partitioning mesh")
 
@@ -379,7 +376,7 @@ def create_config():
     config["decompose"] = "no"
     config["decompose-backend"] = "dc-cpu-devel"
     config["decompose-np"] = "128"
-    config["decompose-N"] = "2"
+    config["decompose-N"] = "1"
     config["submit"] = "no"
 
     with open(CONFIGFILE, 'w') as json_file:
