@@ -15,6 +15,8 @@ xnsdir="xns$XNS_DIR_SUFFIX"
 ewddir="ewd$XNS_DIR_SUFFIX"
 mathlibdir="mathlib$XNS_DIR_SUFFIX"
 sparskitdir="sparskit$XNS_DIR_SUFFIX"
+splinelibdir="splinelib$XNS_DIR_SUFFIX"
+cutlibdir="cutlib$XNS_DIR_SUFFIX"
 
 
 function preclean()
@@ -23,6 +25,8 @@ function preclean()
     rm -rf "$basedir/$ewddir/build"
     rm -rf "$basedir/$mathlibdir/build"
     rm -rf "$basedir/$sparskitdir/build"
+    rm -rf "$basedir/$splinelibdir/build"
+    rm -rf "$basedir/$cutlibdir/build"
     rm -rf "$basedir/$xnsdir/build"
 
 }
@@ -31,8 +35,8 @@ function builder()
 {
     
     ## GCC10 hack
-    export FCFLAGS="-w -fallow-argument-mismatch -fcray-pointer -O2"
-    export FFLAGS="-w -fallow-argument-mismatch  -fcray-pointer -O2"
+    export FCFLAGS="-w -fallow-argument-mismatch -fcray-pointer"
+    export FFLAGS="-w -fallow-argument-mismatch  -fcray-pointer"
 
     pkgdir="$1"
     extraargs="$2"
@@ -114,6 +118,8 @@ function pull_latest_all()
     pull_rebase "$ewddir" "main"
     pull_rebase "$mathlibdir" "main"
     pull_rebase "$sparskitdir" "main"
+    pull_rebase "$splinelibdir" "main"
+    pull_rebase "$cutlibdir" "main"
     pull_rebase "$xnsdir" "main"
 }
 
@@ -191,4 +197,6 @@ load_modules
 [ "$build_deps" = "ON" ] && builder "$ewddir" "$extraargs"
 [ "$build_deps" = "ON" ] && builder "$mathlibdir" "$extraargs"
 [ "$build_deps" = "ON" ] && builder "$sparskitdir" "$extraargs"
+[ "$build_deps" = "ON" ] && builder "$splinelibdir" "$extraargs"
+[ "$build_deps" = "ON" ] && builder "$cutlibdir" "$extraargs"
 builder "$xnsdir" "$extraargs"
