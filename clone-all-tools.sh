@@ -8,7 +8,10 @@ set -euo pipefail
 #       --ssh: will pull via ssh, default
 #       any positional arguments left are considered repo names to be pulled
 
+BRANCH="master"
+ARGS=""
 MODE="SSH"
+RMGIT=false # flag to remove the .git folder. Useful in JURECA to not get prompted the password thanks to my shell trying to access git stats
 ALL=( checkperiodic extractRNG extractTS genmesh genmprd gennmat gmsh2mixd gmsh2mixdv2 mapflow mixd2pvtu mixdclass mixdsplit mixdvolume normmixd pymesh rmmat scalemixd scripts shiftmixd stitchperiodic xcad )
 
 REPOS=()
@@ -25,6 +28,12 @@ do
         --ssh)
             echo "Cloning with SSH"
             MODE="SSH"
+            shift # past value
+            ;;
+        --no-git)
+            echo "Performing a shallow clone and removing git history"
+            ARGS="$ARGS --depth 1"
+            RMGIT=true
             shift # past value
             ;;
         *)    # unknown option
@@ -44,5 +53,10 @@ fi
 [[ ${#REPOS[@]} == 0 ]] && REPOS=${ALL[@]}
 
 for REPO in ${REPOS[@]}; do 
-    git clone "$SERVER/$REPO.git"
+    git clone $ARGS "$SERVER/$REPO.git"
+    if [ $RMGIT = true ]; then
+        rm -rf "$REPO/.git"
+    fi
 done
+
+# https://jugit.fz-juelich.de/IBG-1/ModSim/Chroma-HD/$REPO/-/archive/master/$REPO-master.tar.gz
