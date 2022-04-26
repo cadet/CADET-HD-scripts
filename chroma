@@ -27,6 +27,8 @@ import shutil
 import argparse
 import subprocess
 
+from rich import print
+
 from pathlib import Path
 from os import environ, chdir, stat
 from tempfile import NamedTemporaryFile
@@ -142,6 +144,8 @@ def read_config():
     if args['periodic']:
         config['periodic'] = args['periodic']
 
+    print(config)
+
 
 
 def setup_dirs():
@@ -256,9 +260,9 @@ def decompose_flow():
     elif config['decompose'] == 'yes':
         run_command('decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
     elif config['decompose'] == 'mpi':
-        run_command('mpiexec -np ' + config['decompose-nprocs'] + ' decompose.metis -e '+ ETYPE + '-w -p ' + config['job-cpus'])
+        run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e '+ ETYPE + '-w -p ' + config['job-cpus'])
     elif config['decompose'] == 'backend':
-        run_command('srun -N ' + config['decompose-nnodes'] + ' -n' + config['decompose-nprocs'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-backend'] + ' decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
+        run_command('srun -N ' + config['decompose-N'] + ' -n' + config['decompose-np'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-backend'] + ' decompose.metis -e ' + ETYPE + '-w -p ' + config['job-cpus'])
 
     chdir(root)
     setup_flow()
@@ -290,9 +294,9 @@ def decompose_mass():
     elif config['decompose'] == 'yes':
         run_command('decompose.metis -e '+ ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
     elif config['decompose'] == 'mpi':
-        run_command('mpiexec -np ' + config['decompose-nprocs'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
+        run_command('mpiexec -np ' + config['decompose-np'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
     elif config['decompose'] == 'backend':
-        run_command('srun -N ' + config['decompose-nnodes'] + ' -n' + config['decompose-nprocs'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-backend'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
+        run_command('srun -N ' + config['decompose-N'] + ' -n' + config['decompose-np'] + ' -A ' + config['job-acct'] + ' -p ' + config['decompose-backend'] + ' decompose.metis -e ' + ETYPE + '--mprd mtbl -w -p ' + config['job-cpus'] + ' -s')
 
     ## TODO: check that this is proper
     run_command('gennmat ' + NEN + 'st')
@@ -395,6 +399,7 @@ def kernel(mshfile):
     read_config()
 
     execstring = args['execute']
+    print(f"{execstring = }")
 
     if (execstring is None):
         setup_dirs()
