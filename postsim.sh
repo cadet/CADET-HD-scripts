@@ -31,7 +31,7 @@ NREC=$(( $(stat --printf="%s" data.all) / ( NN * 2 * 8 ) ))
 echo "Found $NREC records in data.all"
 LASTREC=$(( $NREC - 1 ))
 echo "Extracting last timestep: $LASTREC"
-exts -m "$minffile" -f data.all -n 2 -o data.in -t "$LASTREC"
+extractTS -m "$minffile" -f data.all -n 2 -o data.in -t "$LASTREC"
 
 mkdir "$DIR"
 mv chromatogram data.all out-* xns.log "$DIR"
