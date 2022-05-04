@@ -32,12 +32,12 @@ from multiprocessing import Pool
 from functools import partial
 import pickle
 import os.path
+import csv
 
 # NPARTYPE    = 10                   ## NPARTYPE in CADET == number of bins to sort particles by size
 # NRAD = 20                          ## NRAD in CADET == Number of radial shells
 
 def csvWriter(filename, x, y):
-    import csv
     with open(filename, 'w') as f:
         writer = csv.writer(f)
         writer.writerows(zip(x, y))
@@ -389,6 +389,10 @@ def main():
 
     if args['dry_run']:
         sys.exit(0)
+
+    with open(args['output_prefix'] + '_beads.csv', 'w') as f:
+        writer = csv.writer(f)
+        writer.writerows([[bead.r] for bead in fullBed.beads])
 
     volFrac, bin_radii = histo([bead.r for bead in fullBed.beads], filename=args['output_prefix'] + '_psd', bins=args['npartype'])
 
