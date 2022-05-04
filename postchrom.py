@@ -164,7 +164,7 @@ def main():
         if file.endswith(".log"):
             mesh_log_path = (os.path.abspath(file))
 
-    t, c          = read_chromatogram(os.path.join('MASS', msimfolder, 'chromatogram'))
+    t, c          = readChromatogram(os.path.join('MASS', msimfolder, 'chromatogram'))
     xns_flow_data = read_xns_in(os.path.join('FLOW', fsimfolder, 'xns.in'))
     xns_mass_data = read_xns_in(os.path.join('MASS', msimfolder, 'xns.in'))
     mesh_data     = read_mesh_log(mesh_log_path)
