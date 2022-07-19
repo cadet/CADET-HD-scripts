@@ -12,6 +12,7 @@ For ex. If I have data from a mesh convergence study, and want to predict the th
 import csv
 import os
 import numpy as np
+from subprocess import run
 
 from matplotlib import pyplot as plt
 from sklearn.linear_model import LinearRegression
@@ -32,16 +33,39 @@ def fit_line(x, y):
 
     return score, model.coef_[0], model.intercept_
 
-def read_file(fname:str): 
+def readfile(data_path, columns=[0,1], header=False, xticksColumn=0):
+    """ Read x-y CSV-style files
     """
-    Read a 2-column csv file
-    """
+    if ':' in data_path:
+        run(['scp', '-rC', data_path, '/tmp/plotting.csv'])
+        data_path = '/tmp/plotting.csv'
+
     x = []
     y = []
-    with open(fname, 'r') as fp:
-        for line in csv.reader(fp): 
-            x.append(float(line[0]))
-            y.append(float(line[1]))
+    xticks = []
+    # columns = [0, 1]
+    delimiter = ' '
+    with open(data_path, newline='') as csvfile:
+        if ',' in csvfile.readline():
+            delimiter = ','
+    with open(data_path, newline='') as infile:
+        # data = list(csv.reader(infile))
+        if header:
+            print(infile.readline())
+        for line in infile:
+            data_line = line.strip().split(delimiter)
+            data_line = list(filter(None, data_line))
+            if (data_line != []):
+                if len(data_line) == 1:
+                    y.append(float(data_line[0]))
+                else:
+                    x.append(float(data_line[columns[0]]))
+                    y.append(float(data_line[columns[1]]))
+                # if columns[0] != -1:
+                #     x.append(float(data_line[columns[0]]))
+                # y.append(float(data_line[columns[1]]))
+                if xticksColumn is not None: 
+                    xticks.append(float(data_line[xticksColumn]))
 
     return x, y
 
@@ -65,7 +89,7 @@ def main():
         fig, ax = plt.subplots()
 
         for f in args.FILES: 
-            x,y = read_file(f)
+            x,y = readfile(f)
             ys.append(y)
             xs.append(x)
             ax.plot(x,y, lw=2)
