@@ -271,7 +271,7 @@ def main():
 
     ap.add_argument("-i", "--inputfile", help="Input file used for genmesh")
     ap.add_argument("-p", "--packing", help="Packing file")
-    ap.add_argument("-z", "--zlimits", type=float, nargs=2, help="bottom z value for packing slice")
+    ap.add_argument("-z", "--zlimits", type=float, nargs=2, help="bottom/top z value for packing slice. Limits based on bead centers.")
     ap.add_argument("-psf", "--pre-scaling-factor", type=float, default=1, help="Scaling factor to account for differences in mono/poly packing data")
     ap.add_argument("-msf", "--mesh-scaling-factor", type=float, default=1e-4, help="Post meshing scaling factor")
     ap.add_argument("-rf", "--r-factor", type=float, default=1, help="Bead radius shrinking factor")
@@ -285,6 +285,9 @@ def main():
 
     ap.add_argument("-d", "--dry-run", help="Do not calculate vol_frac, porosities and mean_radii", action='store_true')
     ap.add_argument("-o", "--output-prefix", help="prefix to output for radial porosity plot and PSD histogram", required=True)
+
+    ap.add_argument("--inlet", type=float, default=2.5, help="Void space before zlimits.")
+    ap.add_argument("--outlet", type=float, default=2.5, help="Void space after zlimits.")
 
     args = vars(ap.parse_args())
 
@@ -327,10 +330,9 @@ def main():
 
     relativeBridgeRadius = 0.2
 
-    ## TODO: Variable Inlet and Outlet
     rCylDelta = 0.01*meshScalingFactor
-    inlet = 2.5 * meshScalingFactor
-    outlet = 2.5 * meshScalingFactor
+    inlet = args['inlet'] * meshScalingFactor
+    outlet = args['outlet'] * meshScalingFactor
 
     fullBed = PackedBed()
 
