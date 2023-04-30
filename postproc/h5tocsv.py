@@ -72,6 +72,7 @@ for f in args['files']:
             if sim.root.input.model[unit].discretization.par_disc_type == b'EQUIDISTANT_PAR':
                 par_radius = sim.root.input.model[unit].par_radius
                 npar = sim.root.input.model[unit].discretization.npar
+                ## WARNING: Probably wrong?
                 dx_particle = par_radius/(npar-1)
                 print("par radius:", par_radius)
                 print("npar: ", npar)
@@ -94,6 +95,7 @@ for f in args['files']:
             ## TODO: Use numpy.squeeze to flatten array axis with length = 1
 
             y = [ g[0][0] / (par_radius) for g in y ]
+            # y = [ g[0][0] for g in y ]
 
             print(y)
 

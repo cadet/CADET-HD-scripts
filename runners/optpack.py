@@ -62,7 +62,7 @@ def genpack(rate, target_porosity):
     seed(a=None, version=2)
     myseed = randint(0,2147483647)
 
-    shutil.copy('packing.fba.xyzd', 'packing.xyzd')
+    shutil.copy('../packing.xyzd', 'packing.xyzd')
     sed_inplace('generation.conf', 'Contraction rate.*', 'Contraction rate: ' + str(rate) )
     sed_inplace('generation.conf', 'Seed.*', 'Seed: ' + str(myseed) )
     out = run_command_in_shell('PackingGeneration.exe -ls')

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Repo with Andreas Puettmann's stuff:  svn+ssh://svn@ibtmodsimhub.ibt.kfa-juelich.de/puettmann
+
 set -euo pipefail
 
 ## NOTE: Usage: 
@@ -60,3 +62,4 @@ for REPO in ${REPOS[@]}; do
 done
 
 # https://jugit.fz-juelich.de/IBG-1/ModSim/Chroma-HD/$REPO/-/archive/master/$REPO-master.tar.gz
+#

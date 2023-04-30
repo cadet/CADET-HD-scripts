@@ -114,6 +114,10 @@ class PackedBed:
         self.zmax = max(zpr)
         self.zmin = min(zmr)
 
+        self.dx = self.xmax - self.xmin
+        self.dy = self.ymax - self.ymin
+        self.dz = self.zmax - self.zmin
+
         self.R = max((self.xmax-self.xmin)/2, (self.ymax-self.ymin)/2) ## Similar to Genmesh
         self.h = self.zmax - self.zmin
         self.CylinderVolume = pi * self.R**2 * self.h
@@ -276,6 +280,9 @@ def main():
     ap.add_argument("-msf", "--mesh-scaling-factor", type=float, default=1e-4, help="Post meshing scaling factor")
     ap.add_argument("-rf", "--r-factor", type=float, default=1, help="Bead radius shrinking factor")
 
+    ap.add_argument("-c", "--container", default='cylinder', choices=['cylinder', 'box'], help="type of container")
+    ap.add_argument("-ccsa", "--container-cross-section-area", type=float, help="Container cross section area")
+
     ap.add_argument("--nrad", type=int, default=1, help="NRAD, number of radial shells in 2D model")
     ap.add_argument("--npartype", type=int, default=1, help="NPARTYPE, number of bins to sort particles by size")
     ap.add_argument("-st"  , "--shelltype", choices = ['EQUIDISTANT', 'EQUIVOLUME'], default='EQUIDISTANT', help="Shell discretization type")
@@ -357,22 +364,33 @@ def main():
     print("zmax = {}, zmin = {}".format(fullBed.zmax, fullBed.zmin))
 
     print("Cylinder Radius (with rCylDelta):", R)
-    print("Cylinder Height (full):", h)
+    print("Container Height (full):", h)
     print("Bed Height (zmax - zmin):", hBed)
+    print("Inlet length till bead zBot: ", inlet)
+    print("Outlet length till bead zBot: ", outlet)
 
     # print("Cylinder Volume:", fullBed.CylinderVolume)
     # print("Packed Bed Volume:", fullBed.volume())
     # print("nBeads: ", len(fullBed.beads))
 
-    cylvol = pi*R**2*h
-    bedcylvol = pi*R**2*hBed
+
+    if args['container'] == 'cylinder': 
+        container_cross_section_area = pi*R**2
+    elif args['container'] == 'box': 
+        container_cross_section_area = fullBed.dx * fullBed.dy
+
+    if args['container_cross_section_area']: 
+        container_cross_section_area = args['container_cross_section_area'] * args['mesh_scaling_factor']**2
+
+    container_volume = container_cross_section_area * h
+    container_bedlength_volume = container_cross_section_area * hBed
 
     print("nBeads: ", len(fullBed.beads))
-    print("Cylinder Volume:", cylvol)
+    print("Container Volume:", container_volume)
     print("Packed Bed Volume:", fullBed.volume())
-    print("Bed Cylinder Volume:", pi * R**2 * hBed)
-    print("Column Porosity:", 1-(fullBed.volume()/cylvol))
-    print("Bed Porosity:", 1-(fullBed.volume()/bedcylvol))
+    print("Container Bed-Length Volume:", container_bedlength_volume)
+    print("Column Porosity:", 1-(fullBed.volume()/container_volume))
+    print("Bed Porosity:", 1-(fullBed.volume()/container_bedlength_volume))
 
 
     # # bridgeOffsetRatio = 0.95

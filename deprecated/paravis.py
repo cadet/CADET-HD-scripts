@@ -3,6 +3,7 @@
 ## https://www.paraview.org/Wiki/ParaView_and_Python#Control_the_camera
 
 """ The successor script to vis.py
+NOTE: THIS SCRIPT IS DEPRECATED. USE PARAVISION INSTEAD.
 
     @ideal usage:
         $ paravis.py --pipeline project screenshot --project clip Plane 0.1 z -s None -v z y

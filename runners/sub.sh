@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 ## JURECA jobscript wrapper
+## ========= DEPRECATED. See jrun instead ============
 ## usage: Create + Edit + Submit: $sub.sh 
 ## usage: Edit + Submit: $sub.sh -e
 ## usage: Pager: $sub.sh -p

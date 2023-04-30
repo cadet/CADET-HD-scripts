@@ -23,16 +23,24 @@ All 3 of the above files need to be in little endian binary formats (int, double
 
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
+import matplotlib as mpl 
 import pickle
 import numpy as np
 import struct
 import argparse
 import random
+import csv
 
 from matplotlib.ticker import ScalarFormatter,AutoMinorLocator
 from matplotlib.ticker import FormatStrFormatter, StrMethodFormatter
 from matplotlib import ticker
 
+import seaborn as sns
+
+def csvWriter(filename, x, y):
+    with open(filename, 'w') as f:
+        writer = csv.writer(f)
+        writer.writerows(zip(x, y))
 
 def bin_to_arr(filename, f):
     with(open(filename, 'rb')) as input:
@@ -58,9 +66,13 @@ ap = argparse.ArgumentParser()
 # ap.add_argument("files", nargs='*', help="files to plot")
 ap.add_argument("-f", "--filebasename", default="bead_loading", help="basename of files with .inf, .xyzr, and .dat to read data from. Default is bead_loading")
 
-ap.add_argument("-t", "--title", default="Particle loading", help="title")
+ap.add_argument("-t", "--title", help="title")
 ap.add_argument("-x", "--xlabel", default="Time", help="xlabel")
 ap.add_argument("-y", "--ylabel", default="$\\frac{c_s}{c_s^{max}}$", help="ylabel")
+
+ap.add_argument("-ytx", "--ytick-positions", nargs='*', type=float)
+ap.add_argument("-ytl", "--ytick-labels", nargs='*')
+
 ap.add_argument("-xl", "--xlims", nargs=2, type=float, help="x axis limits")
 ap.add_argument("-yl", "--ylims", nargs=2, type=float, help="y axis limits")
 ap.add_argument("-lw", "--linewidth", default=1, type=float, help="linewidth")
@@ -150,6 +162,10 @@ if args['scatter']:
             ys.append(yt)
 
         plt.scatter(ys, xs, s=1)
+        # sns.regplot(ys, xs, ci=99, ax=ax)
+        
+        csvWriter(f"ts90_{args['sort']}.csv",xs, ys )
+
         ax.set(title=args['title'])
         # ax.set(ylabel=f"Time for slope $<$ {min_dy}")
         ax.set(ylabel="$t_{s}^{90}$")
@@ -190,12 +206,47 @@ else:
         ax.set(ylabel=args['ylabel'])
         ax.autoscale(tight=True)
 
+        # Ytick labels in %
+        ytx, ytl = plt.yticks()
+        if args['ytick_positions']:
+            ytx = args['ytick_positions']
+        if args['ytick_labels']:
+            ytl = args['ytick_labels']
+        if args['ytick_positions'] or args['ytick_labels']:
+            plt.yticks(ytx, ytl)
+
         ax.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
 
         if args['xlims']:
             plt.xlim(args['xlims'])
         if args['ylims']:
             plt.ylim(args['ylims'])
+
+        if args['sort'] == 'z':
+            vmin=xyzr[0,2]
+            vmax=xyzr[-1,2]
+            label = 'Axial position ($z$)'
+        elif args['sort'] == 'r':
+            vmin=xyzr[0,3]
+            vmax=xyzr[-1,3]
+            label = 'Particle radius($r$)'
+        elif args['sort'] == 'xy':
+            vmin = np.sqrt(xyzr[0,0] ** 2  + xyzr[0,1] ** 2)
+            vmax = np.sqrt(xyzr[-1,0] ** 2  + xyzr[-1,1] ** 2)
+            label = 'Radial position ($xy$)'
+        else: 
+            raise RuntimeError("Unknown sort method")
+  
+        # Normalizer
+        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+          
+        # creating ScalarMappable
+        sm = plt.cm.ScalarMappable(cmap=cm.rainbow, norm=norm)
+        sm.set_array([])
+          
+        plt.colorbar(sm, label=label, ticks=np.linspace(vmin, vmax, 4), format='%.2e')
+  
+
         if args['output']:
             fig.savefig(args['output'], dpi=300)
         else: 

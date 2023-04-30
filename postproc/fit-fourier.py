@@ -48,16 +48,16 @@ def readfile(data_path, columns=[0,1], header=False, xticksColumn=0):
                 if xticksColumn is not None: 
                     xticks.append(float(data_line[xticksColumn]))
 
-    return np.array(x), np.array(y), xticks
+    return np.array(x), np.array(y)
 
 def series(An, r):
     ## Amplitude phase form as per wikipedia
-    sum = np.zeros_like(r)
-    sum += An[0] / 2
+    # sum = np.zeros_like(r)
+    sum = An[0]/2
     period = r[-1]
+    # period = 5.01e-4
     for n, an in enumerate(An[1:]): 
         sum += an*np.cos(2*np.pi*(n+1)*r/period)
-        # sum += an*np.sin(2*np.pi*(n+1)*r/period)
     return sum
 
 
@@ -70,8 +70,19 @@ def csvWriter(filename, x, y):
         writer = csv.writer(f)
         writer.writerows(zip(x, y))
 
-def driver(fname:str, Nu=0, smoothen_order=0, smoothen_npoints=250):
-    x,y,_ = readfile(fname)
+def smoothen(x, y, smoothen_order, smoothen_npoints):
+    xsmooth = np.linspace(min(x), max(x), smoothen_npoints) 
+    x_new = np.array(x)
+    y_new = np.array(y)
+    ordering = x_new.argsort()
+    x_new = x_new[ordering]
+    y_new = y_new[ordering]
+    spl = make_interp_spline(x_new, y_new, k=smoothen_order)  # type: BSpline
+    ysmooth = spl(xsmooth)
+    return xsmooth, ysmooth
+
+def driver(fname:str, Nu=0, smoothen_order=0, smoothen_npoints=250, output_suffix='coeffs'):
+    x,y = readfile(fname)
 
     if smoothen_order: 
         xsmooth = np.linspace(min(x), max(x), smoothen_npoints) 
@@ -116,23 +127,58 @@ def driver(fname:str, Nu=0, smoothen_order=0, smoothen_npoints=250):
         # ax2.set_ylabel('Value')
         ax2.set_title(f'Coeffs, N={Nu}')
 
-        # csvWriter(f"{fname}_coeffs.csv", range(Nu), An)
+        csvWriter(f"{fname}_{output_suffix}.csv", range(Nu), An)
 
-        # plt.savefig(f'{fname}.pdf')
-        plt.show()
+        plt.savefig(f'{fname}.pdf')
+        # plt.show()
+
+def inverse(coeffs:str, rfile:str, write:bool=True): 
+    _,An = readfile(coeffs)
+    r,_ = readfile(rfile)
+    y = series(An, r)
+    if write:
+        csvWriter(f"{rfile}_from_coeffs.csv", r, y)
+    return r, y
+
+
+def inverse_loop(coeffs:str, rfile:str):
+    _,An = readfile(coeffs)
+    r,_ = readfile(rfile)
+    for i in [0.5, 1, 1.5, 2, 5, 300]: 
+        y = series(An * i, r)
+        csvWriter(f"{rfile}_{i}_from_coeffs.csv", r, y)
 
 
 def main(): 
     ap = argparse.ArgumentParser()
     ap.add_argument('FILES', nargs='*', help='files to process. ideally, smooth')
+
     ap.add_argument('-n', type=int, default=0, help='Nu value = number of fourier series terms. If not given, assumed equal to number of points in data')
+
     ap.add_argument("--smoothen", nargs='?', type=int, const=3, help="(Cubic) spline interpolation through provided data. --smoothen <order>, with default order=3")
     ap.add_argument("--smoothen-npoints", default=250, type=int, help="Number of points to use for --smoothen interpolation")
+
+    ap.add_argument("--inverse", help='coeffs file to use to generate the curve. X-axis points taken from FILES.')
+    ap.add_argument("--inverse-loop", help='coeffs file to use to generate the curve. X-axis points taken from FILES.')
+
+    ap.add_argument('-o', '--output-suffix', default='coeffs', help='Output suffix for coeffs csv file')
+
     args = ap.parse_args()
 
     # TODO: Parallelize
     for fname in args.FILES: 
-        driver(fname, Nu=args.n, smoothen_order=args.smoothen, smoothen_npoints=args.smoothen_npoints)
+        if args.inverse: 
+            inverse(args.inverse, fname)
+        elif args.inverse_loop:
+            inverse_loop(args.inverse_loop, fname)
+        else: 
+            driver( 
+                    fname, 
+                    Nu=args.n, 
+                    smoothen_order=args.smoothen, 
+                    smoothen_npoints=args.smoothen_npoints,
+                    output_suffix=args.output_suffix
+                    )
 
 if __name__ == "__main__": 
     main()

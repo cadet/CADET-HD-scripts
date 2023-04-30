@@ -54,6 +54,8 @@ from pyfzf.pyfzf import FzfPrompt
 from functools import reduce
 import plumbum
 
+
+
 ENCODING = 'ascii'
 yaml=YAML(typ='safe')
 yaml.default_flow_style=False
@@ -68,6 +70,7 @@ ap.add_argument("-d", "--diff", nargs=2, help="Diff 2 files. Can diff yaml vs h5
 ap.add_argument("--extract", help="Plot using fzf to browse the hdf5")
 ap.add_argument("--serialize", help="Serialize all entries in the file")
 ap.add_argument("--run", action='store_true', help="Save a file and run a simulation")
+ap.add_argument("--plot-connections", action='store_true', help="Save a file and run a simulation")
 ap.add_argument("files", nargs='*', help="Input files. Will be applied in order")
 args = vars(ap.parse_args())
 
@@ -224,6 +227,16 @@ def deep_get(input_dict, keys, default=None, vartype=None, choices=[]):
 
     return value
 
+def plot_connections(connections):
+    # FIXME: Incomplete
+    for switch in connections:
+        if 'switch_' in switch:
+            conn = connections[switch]['connections']
+            conn = np.reshape(conn, (-1,7))
+            print(conn)
+            conn = np.delete(conn, [2,3,4,5,6], 1)
+
+
 def serialize(config:dict):
     paths = []
     for key in config:
@@ -305,6 +318,6 @@ elif args['files']:
         save_file(config, args['output'], update=args['update'])
     elif args['run']:
         save_file(config, "_".join(args['files']).replace('.h5','').replace('.yaml', '') + '.h5' ).run()
-
-
+    elif args['plot_connections']:
+        plot_connections(deep_get(config, 'input.model.connections'))
 

@@ -13,10 +13,15 @@ import csv
 import os
 import numpy as np
 from subprocess import run
+from scipy.interpolate import interp1d
+from scipy.optimize import curve_fit
 
 from matplotlib import pyplot as plt
 from sklearn.linear_model import LinearRegression
 import argparse
+
+def exp_func(x, a, b, c):
+    return a * np.exp(-b * x) + c
 
 def fit_line(x, y): 
     """
@@ -30,8 +35,14 @@ def fit_line(x, y):
     model.fit(X, Y)
 
     score = model.score(X,Y)
+    m = model.coef_[0]
+    c = model.intercept_
 
-    return score, model.coef_[0], model.intercept_
+    return score, m, c
+
+def extrapolate(x0, y0, x, kind='linear'): 
+    f = interp1d(x0, y0, kind=kind, fill_value='extrapolate')
+    return f(x)
 
 def readfile(data_path, columns=[0,1], header=False, xticksColumn=0):
     """ Read x-y CSV-style files
@@ -79,6 +90,7 @@ def main():
     ap.add_argument('FILES', nargs='*', help='Files with 2-column csv data')
     ap.add_argument('--scores', nargs='*', type=float, required=True, help='scores corresponding to the input FILES')
     ap.add_argument('--predict', type=float, required=True, help='The score for which the curve will be predicted')
+    ap.add_argument('--kind', default='linear', choices=['linear', 'quadratic', 'cubic'], help='Type of extrapolation')
     args = ap.parse_args()
 
     ys = []
@@ -100,16 +112,22 @@ def main():
         n_points = len(ys[0])
 
         for i in range(n_points): 
-            r2, m,c = fit_line(args.scores, yst[i])
-            if r2 < 0.90: 
-                print(f"Bad-ish fit for {i}: R2 = {r2}")
-            final_y.append(m * args.predict + c)
+
+            # # Fits a line through all points
+            # r2, m,c = fit_line(args.scores, yst[i])
+            # if r2 < 0.90: 
+            #     print(f"Bad-ish fit for {i}: R2 = {r2}")
+            # final_y.append(m * args.predict + c)
+
+            ## Extrapolates using last n points
+            new_y = extrapolate(args.scores, yst[i], [args.predict], kind=args.kind)
+            final_y.append(new_y[0])
 
         # WARNING: Assumes that x is the same
         ax.plot(xs[0], final_y, lw=2, c='black')
         plt.show()
 
-        csvWriter(f'predicted-{args.predict}.csv', xs[0], final_y)
+        csvWriter(f'predicted-{args.predict}-{args.kind}.csv', xs[0], final_y)
 
 if __name__ == "__main__": 
     main()

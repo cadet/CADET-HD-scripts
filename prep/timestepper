@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 t = 0
-tend=12000
+tend=40
 count = 0
 
 times=[]
@@ -16,8 +16,10 @@ steps=[]
 times.append(t)
 
 while t<tend:
-    dt = 1 + np.heaviside(t-100,1) * (t/20 - 5)
+    # dt = 1 + np.heaviside(t-100,1) * (t/20 - 5)
     # dt = 5 + np.heaviside(t-100,1) * (45) + np.heaviside(t-500,1) * (t/20)
+    # dt = 2.0 + np.heaviside(t-100,1) * (2.0 * t/100 - 2)
+    dt = 0.5
     t = t + dt
     times.append(t)
     steps.append(dt)
