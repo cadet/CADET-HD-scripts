@@ -1,0 +1,45 @@
+## NRAD is inferred from col_porosity_2d
+## Values assume no dpfr
+
+# void_length: 0.0002
+# bed_length: 0.0156
+
+bed_length: 0.0160
+col_radius: 0.000501
+par_porosity: 0.75
+velocity: 0.000209
+velocity_interstitial: 0.00048154525859278157
+velocity_interstitial_2d: [0.0003956322406062438, 0.00039828655059558814, 0.00040840233735901435, 0.00048387262894230757, 0.0005436585254263407]
+# flowrates: [1.6289296224699493e-10]
+# flowrates_2d: [ 4.871784725572529e-12, 1.4573277959403384e-11, 2.488913842562032e-11, 4.4201631339027727e-11, 7.32021920821342e-11 ]
+inlet_concentration: [0.00714]
+adsorption_model: MULTI_COMPONENT_LANGMUIR
+mcl_ka: [1.144]
+mcl_kd: [0.002]
+mcl_qmax: [4.88]
+ncomp: 1
+par_diffusion: [7.07e-11]
+par_surfdiffusion: 0
+film_diffusion: 1000
+col_dispersion: [ 6.5e-07 ]
+col_dispersion_radial: [ 6.5e-07 ]
+col_porosity: 0.42590409017425
+col_porosity_2d: [0.3904011587941294, 0.38668296193853413, 0.38642598628796476, 0.41373654748231714, 0.47431849399202486]
+par_radius: 4.9985e-05
+par_radius_psd: []
+par_type_volfrac: []
+par_type_volfrac_2d: []
+radial_disc_type: EQUIDISTANT
+nts: 100
+section_times: [0, 12000]
+is_kinetic: True
+ncol: 100
+npar: 10
+ncol_dpfr: 10
+init_c: 0.0
+init_cp: 0.0
+init_q: 0.0
+csvout: [unit_001/solution_outlet_comp_000]
+
+
+
