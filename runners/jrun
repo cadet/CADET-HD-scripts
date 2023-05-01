@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+
+##    _                  
+##   (_)_ __ _   _ _ __  
+##   | | '__| | | | '_ \ 
+##   | | |  | |_| | | | |
+##  _/ |_|   \__,_|_| |_|
+## |__/                  
+
+## JURECA-RUN
+
+## Script to make it easy to submit jobs to the cluster queue
+## USAGE: jrun
+## USAGE: jrun -n  # No prompt after vipe
+## USAGE: jrun -c 'srun -n 48 commandname'
+## USAGE: jrun -c 'pvrun -np 48 volume_integral -o output_prefix ...'
+
+# set -euo pipefail
+
+mkdir -p .jobs
+
+SCRIPT_PATH=$(readlink -f -- "$BASH_SOURCE")
+
+COMMAND=""
+PROMPT=true
+EDIT=true
+INJOBFILE=""
+NPROC=48
+NTPN=48         # Num Tasks Per Node
+MODE="VIS"
+
+POSITIONAL=()
+while [[ $# -gt 0 ]]
+do
+    key="$1"
+
+    case $key in
+        -c|--command)
+            COMMAND="$2"
+            shift # past value
+            shift # past value
+            ;;
+        -n|--no-prompt)
+            PROMPT=false
+            shift # past value
+            ;;
+        -ne|--no-edit)
+            EDIT=false
+            shift
+            ;;
+        -l|--last)
+            INJOBFILE=$(ls -At .jobs/*.job | head -n1)
+            shift
+            ;;
+        -ls|--list)
+            INJOBFILE=$(ls -At .jobs/*.job | fuzscope)
+            shift
+            ;;
+        -s|--show)
+            less $(ls -At .jobs/* | fuzscope)
+            exit
+            ;;
+        -t|--tail)
+            tail -F $(ls -At .jobs/* | fuzscope)
+            exit
+            ;;
+        -tr|--tail-running)
+            job_ids=$(find .jobs -iname '*.job' -printf "%P" | sed 's/.job/|/g' )
+            job_ids=$(squeue -u rao2 -h | grep -P ${job_ids%%|} | awk '{print $1}' | sed 's/^/.jobs\//;s/$/.out/')
+            tail -F $job_ids
+            exit
+            ;;
+        -r|--running)
+            job_ids=$(find .jobs -iname '*.job' -printf "%P" | sed 's/.job/|/g' )
+            squeue -u rao2 -h | grep -P ${job_ids%%|}
+            exit
+            ;;
+        -a|--account)
+            tmp=$(ls -At .jobs/*.job | fuzscope)
+            jobid=$(basename "${tmp%%.job}")
+            sacct -j "$jobid" -o NTasks,AllocCPUS,Elapsed 
+            exit
+            ;;
+        -lo|--show-last-out)
+            less $(ls -At .jobs/*.out | head -n1)
+            exit
+            ;;
+        -lj|--show-last-job)
+            less $(ls -At .jobs/*.job | head -n1)
+            exit
+            ;;
+        -le|--show-last-err)
+            less $(ls -At .jobs/*.err | head -n1)
+            exit
+            ;;
+        -la|--last-account)
+            tmp=$(ls -At .jobs/*.job | head -n1)
+            jobid=$(basename "${tmp%%.job}")
+            sacct -j "$jobid" -o NTasks,AllocCPUS,Elapsed 
+            exit
+            ;;
+        -kl|--kill-last)
+            tmp=$(ls -At .jobs/*.job | head -n1)
+            [ -z "$tmp" ] && exit
+            jobid=$(basename "${tmp%%.job}")
+            ans="y"
+            read -p $'> \e[31mkill '"$jobid"$'?\e[0m: ' -e -i "$ans" ans
+            [ "$ans" != "y" ] && exit
+            scancel "$jobid"
+            exit
+            ;;
+        -kr|--kill-running)
+            job_ids=$(find .jobs -iname '*.job' -printf "%P" | sed 's/.job/|/g' )
+            job_ids=$(squeue -u rao2 -h | grep -P $job_ids | awk '{print $1}')
+            echo "$job_ids" | xargs scancel
+            exit
+            ;;
+        -np|--nproc)
+            NPROC=$2
+            shift
+            shift
+            ;;
+        -nt|--ntpn)
+            NTPN=$2
+            shift
+            shift
+            ;;
+        -x|--xns)
+            MODE="XNS"
+            shift
+            ;;
+        -v|--vis)
+            MODE="VIS"
+            shift
+            ;;
+        -h|--help)
+            echo "jrun: runscript for JURECA-DC"
+            echo "The following args are processed:" 
+            grep -Po '\s*-\w+\|[^)]*' "$SCRIPT_PATH"
+            exit
+            ;;
+        *)    # unknown option
+            POSITIONAL+=("$1") # save it in an array for later
+            shift # past argument
+            ;;
+    esac
+done
+set -- "${POSITIONAL[@]}" # restore positional parameters
+
+
+read -r -d '' HEADER << EOFMARKER
+#!/usr/bin/env bash
+
+##SBATCH -d afterany:8602421
+#SBATCH -J HDChroma
+#SBATCH -n $NPROC
+#SBATCH --ntasks-per-node=$NTPN
+#SBATCH --time=24:00:00
+#SBATCH --partition=dc-cpu
+
+#SBATCH -A jibg12
+#SBATCH -o .jobs/%j.out 
+#SBATCH -e .jobs/%j.err 
+##SBATCH --mail-type=ALL
+##SBATCH --mail-user=jayghosh.rao@rwth-aachen.de
+
+EOFMARKER
+
+if [[ $MODE == "VIS" ]]; then 
+read -r -d '' CMDS << EOFMARKER
+module load paraview/5.10.1 paravision
+source ~/cjibg12/miniconda3/bin/activate paravision
+
+EOFMARKER
+fi
+
+if [[ $MODE == "XNS" ]]; then 
+read -r -d '' CMDS << EOFMARKER
+module load GCC/11.2.0 ParaStationMPI/5.5.0-1 ParMETIS/4.0.3-double Boost/1.78.0 VTK/9.1.0 flex/2.6.4 
+srun -n $NPROC --ntasks-per-node=$NTPN ~/bin/xns-mpi-2022-06-25 < xns.in
+EOFMARKER
+fi
+
+JOBSCRIPT=$(echo -e "$HEADER\n\n$CMDS")
+
+if [ -n "$1" ]; then
+    INJOBFILE="$1"
+fi
+
+if [ -n "$INJOBFILE" ]; then
+    FINAL=$(cat "$INJOBFILE")
+elif [ -n "$COMMAND" ]; then
+    FINAL=$(echo -e "$JOBSCRIPT\n\n$COMMAND")
+else
+    FINAL=$(echo "$JOBSCRIPT")
+fi
+
+if [[ "$EDIT" == true ]]; then
+    FINAL=$(echo -e "$FINAL" | vipe)
+fi
+
+[ -z "$FINAL" ] && exit
+
+echo "$FINAL"
+
+if [[ "$PROMPT" == true ]]; then
+    ANSWER="y"
+    read -p $'> \e[31msubmit?\e[0m: ' -e -i "$ANSWER" ANSWER
+    [ "$ANSWER" != "y" ] && exit
+fi
+
+OUT=$(sbatch <(echo "$FINAL"))
+echo "$OUT"
+
+JOBID=$(echo "$OUT" | awk '{print $NF}')
+echo "Submitted $JOBID"
+
+echo "$FINAL" > ".jobs/$JOBID.job"
