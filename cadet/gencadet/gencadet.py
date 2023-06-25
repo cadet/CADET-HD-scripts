@@ -530,6 +530,67 @@ def create_simulation(mode, ndim, psd, params, outfile):
         connections.extend(conn2)
         connections.extend(conn3)
 
+    elif mode == '1d_dpfr_10units': 
+        # CONNECTION: inlet -> DPFR -> 1d_column*10 -> DPFR
+        # flowrates = getFlowrates(1, params.velocity, params.shelltype, params.column_radius) 
+
+        root.input.model.nunits   = 4
+        root.input.model.unit_000 = get_inlet_unit(params)
+        root.input.model.unit_001 = get_dpfr_unit(params)
+
+        root.input.model.unit_002 = get_grm_unit(params, psd)
+        root.input.model.unit_003 = get_grm_unit(params, psd)
+        root.input.model.unit_004 = get_grm_unit(params, psd)
+        root.input.model.unit_005 = get_grm_unit(params, psd)
+        root.input.model.unit_006 = get_grm_unit(params, psd)
+        root.input.model.unit_007 = get_grm_unit(params, psd)
+        root.input.model.unit_008 = get_grm_unit(params, psd)
+        root.input.model.unit_009 = get_grm_unit(params, psd)
+        root.input.model.unit_010 = get_grm_unit(params, psd)
+        root.input.model.unit_011 = get_grm_unit(params, psd)
+
+        root.input.model.unit_012 = get_dpfr_unit(params)
+
+        root.input['return'].unit_000 = get_ioreturn().unit
+        root.input['return'].unit_001 = get_ioreturn().unit
+        root.input['return'].unit_002 = get_ioreturn().unit
+        root.input['return'].unit_003 = get_ioreturn().unit
+        root.input['return'].unit_004 = get_ioreturn().unit
+        root.input['return'].unit_005 = get_ioreturn().unit
+        root.input['return'].unit_006 = get_ioreturn().unit
+        root.input['return'].unit_007 = get_ioreturn().unit
+        root.input['return'].unit_008 = get_ioreturn().unit
+        root.input['return'].unit_009 = get_ioreturn().unit
+        root.input['return'].unit_010 = get_ioreturn().unit
+        root.input['return'].unit_011 = get_ioreturn().unit
+        root.input['return'].unit_012 = get_ioreturn().unit
+
+        conn1  = connectSerial([(0 ,0)], [(1,0)], flowrates)
+        conn2  = connectSerial([(1 ,0)], [(2,0)], flowrates)
+        conn3  = connectSerial([(2 ,0)], [(3,0)], flowrates)
+        conn4  = connectSerial([(3 ,0)], [(4,0)], flowrates)
+        conn5  = connectSerial([(4 ,0)], [(5,0)], flowrates)
+        conn6  = connectSerial([(5 ,0)], [(6,0)], flowrates)
+        conn7  = connectSerial([(6 ,0)], [(7,0)], flowrates)
+        conn8  = connectSerial([(7 ,0)], [(8,0)], flowrates)
+        conn9  = connectSerial([(8 ,0)], [(9,0)], flowrates)
+        conn10 = connectSerial([(9 ,0)], [(10,0)], flowrates)
+        conn11 = connectSerial([(10,0)], [(11,0)], flowrates)
+        conn12 = connectSerial([(11,0)], [(12,0)], flowrates)
+
+        connections.extend(conn1)
+        connections.extend(conn2)
+        connections.extend(conn3)
+        connections.extend(conn4)
+        connections.extend(conn5)
+        connections.extend(conn6)
+        connections.extend(conn7)
+        connections.extend(conn8)
+        connections.extend(conn9)
+        connections.extend(conn10)
+        connections.extend(conn11)
+        connections.extend(conn12)
+
     elif mode == '2d_parallel_inlet': 
         ## NOTE: Assumes unit_000 to unit_{nrad-1} are inlets, and unit_{nrad} is column
         # CONNECTION: (nrad)*inlets -> 2d_column -> outlet
@@ -778,7 +839,7 @@ def main():
     ap.add_argument("-m2", "--mono2d", action='store_true')
     ap.add_argument("-p1", "--poly1d", action='store_true')
     ap.add_argument("-p2", "--poly2d", action='store_true')
-    ap.add_argument("--mode", choices=['1d', '1d_dpfr', '2d_serial_inlet', '2d_parallel_inlet', '2d_serial_dpfr' ], required=True)
+    ap.add_argument("--mode", choices=['1d', '1d_dpfr', '2d_serial_inlet', '2d_parallel_inlet', '2d_serial_dpfr', '1d_dpfr_10units' ], required=True)
     args = vars(ap.parse_args())
 
 
