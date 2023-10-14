@@ -31,7 +31,6 @@ from mpmath import ellipk, ellipe, ellipf, nstr
 from multiprocessing import Pool
 from functools import partial
 import pickle
-import os.path
 import csv
 
 # NPARTYPE    = 10                   ## NPARTYPE in CADET == number of bins to sort particles by size
@@ -133,6 +132,61 @@ class PackedBed:
             bead.x = bead.x + offsetx
             bead.y = bead.y + offsety
         self.updateBounds()
+
+    def prune_to_volume(self, target_volume:float, eps:float = 1e-3): 
+        """
+        Prune packed bed of beads to reach a target volume
+        """
+        self.updateBounds()
+
+        if self.volume() < target_volume: 
+            print("Cannot prune packed bed! current volume < target volume")
+            print(f"{self.volume() = }")
+            print(f"{target_volume = }")
+            sys.exit(-1)
+
+        delta_volume = self.volume() - target_volume
+
+        print(f"{self.volume() = }")
+        print(f"{target_volume = }")
+        print(f"{delta_volume = }")
+
+        while delta_volume/target_volume > eps: 
+
+            del_zone_beads = list(filter(lambda b: b.z < self.zmin + self.rmax, self.beads)) + list(filter(lambda b: b.z > self.zmax - self.rmax, self.beads)) 
+            print(f"{len(del_zone_beads) = }")
+            out = min(del_zone_beads, key=lambda b: abs(b.volume() - delta_volume))
+
+            self.beads.remove(out)
+
+            print(f"Deleting bead {out} with volume = {out.volume()}")
+
+            self.updateBounds()
+            delta_volume = self.volume() - target_volume
+
+        print(f"{self.volume() = }")
+        print(f"{target_volume = }")
+        print(f"{delta_volume = }")
+        print(f"{len(self.beads) = }")
+        self.updateBounds()
+        self.print_bounds()
+
+    def print_bounds(self): 
+        dic = {
+                'xmin': self.xmin,
+                'xmax': self.xmax,
+                'ymin': self.ymin,
+                'ymax': self.ymax,
+                'zmin': self.zmin,
+                'zmax': self.zmax,
+                'rmin': self.rmin,
+                'rmax': self.rmax,
+                'ravg': self.ravg,
+                'R': self.R,
+                'h': self.h,
+                'volume': self.volume()
+                }
+        print(dic)
 
 
 def grouper(iterable, n):
@@ -286,6 +340,8 @@ def main():
     ap.add_argument("--nrad", type=int, default=1, help="NRAD, number of radial shells in 2D model")
     ap.add_argument("--npartype", type=int, default=1, help="NPARTYPE, number of bins to sort particles by size")
     ap.add_argument("-st"  , "--shelltype", choices = ['EQUIDISTANT', 'EQUIVOLUME'], default='EQUIDISTANT', help="Shell discretization type")
+    ap.add_argument("--prune-to-volume", type=float, default=None, help="Shell discretization type")
+    ap.add_argument("--eps", type=float, default=1e-3, help="Epsilon for prune-to-volume check")
 
     ap.add_argument("-v", "--vartype", help="type of variable stored (d | f | i) in packing file", default='d')
     ap.add_argument("-e", "--endianness", help="> or <", default='<')
@@ -355,6 +411,10 @@ def main():
             fullBed.add(Bead(x, y, z, r))
 
     fullBed.moveBedtoCenter()
+
+    if(args['prune_to_volume']):
+        fullBed.prune_to_volume(args['prune_to_volume'], eps=args['eps'])
+
     R = fullBed.R + rCylDelta ## Adding Rcyldelta
     h = (zTop - zBot)*meshScalingFactor  + inlet + outlet
     hBed = fullBed.h
