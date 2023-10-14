@@ -2,6 +2,8 @@
 
 """
 Given a velocity profile and a target total flowrate, correct the velocity profile by shifting it up/down such that the total flowrate is matched. 
+
+XNS interstitial velocity -> Corrected.
 """
 
 import argparse

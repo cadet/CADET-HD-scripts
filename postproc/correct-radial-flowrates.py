@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+"""
+Pushes flowrate profiles up or down to achieve a target total flowrate. Thus I can calculate the XNS flowrate, and use this to remove the flowrate error while preserving the 2DGRM flowrate profile. Ideally, I use XNS velocity -> forced flowrate -> Corrected forced flowrates.
+"""
+
 import argparse
 import numpy as np
 

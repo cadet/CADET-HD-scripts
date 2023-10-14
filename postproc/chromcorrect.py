@@ -3,6 +3,8 @@
 """chromcorrect.py
 
 To fit/correct 2d chromatograms
+
+TODO: Rename to chrom-compose?
 """
 
 import math
@@ -127,8 +129,6 @@ def main():
     composed = split_to_full(splitchromas, flowrates)
 
     csvWriter('composed_chromatogram.csv', t, composed)
-
-
 
 
 if __name__ == "__main__": 
