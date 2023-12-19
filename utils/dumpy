@@ -28,7 +28,6 @@ import struct
 import sys
 import itertools
 import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
 
 def find_up(name, startdir='.', stopdir='~', multiple=False, norecurse=False, nobreak=False):
@@ -153,6 +152,7 @@ def grouper(iterable, n):
        yield chunk
 
 def scatterPlot(x, y, z, s=4):
+    import matplotlib.pyplot as plt
     fig = plt.figure(figsize=(5,5))
     ax1=fig.add_subplot(2,2,1, projection='3d')
     ax2=fig.add_subplot(2,2,2)
