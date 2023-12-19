@@ -1,6 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -euo pipefail
+## Postsim script
+# Run this after a simulation run in order to make restarting easy
+# Copies results into a subdirectory, modifies xns.in and .xns.time files to appropriate time
+#
+# usage: ./postsim.sh -n [ndf:int]
+
+function die(){
+    echo -e "ERROR: $@" >&2
+    exit -1
+}
 
 findup()
 {
@@ -14,31 +23,92 @@ findup()
     done
 }
 
+filter_integer() {
+    if [[ $1 =~ ^[[:digit:]]+$ ]]; then
+        echo "$1"
+    fi
+}
 
-DIR="${1:-prev}"
+NDF=2
+DIR_IDX=0
 
-## Old method to find Timestep
-# TS=$(grep 'Convergence' xns.log | tail -2 | head -1 | awk '{print $6}')
-# echo "Extracting timestep: $TS"
-# exts -m ../mesh/minf -f data.all -n 2 -o data.in -t "$TS"
+## Find existing directories with the name run_*
+OLD_DIRS=$(find . -type d -name 'run_*' -printf "%P\n")
+OLD_DIRS_IDX=$(echo "$OLD_DIRS" | sed 's/run_//')
+## Trim and list indices only
 
-MESHDIR=$(findup . -type d -iname "mesh")
-[ -n "$MESHDIR" ] && minffile="$MESHDIR/minf" || exit
-[ -f "$minffile" ] && [ -n "$minffile" ] || exit
+## Commandline args processing
+POSITIONAL=()
+while [[ $# -gt 0 ]]
+do
+    key="$1"
+    case $key in
+        -n|--ndf)
+            NDF=$2
+            shift # past value
+            shift # past value
+            ;;
+        *)    # unknown option
+            POSITIONAL+=("$1") # save it in an array for later
+            shift # past argument
+            ;;
+    esac
+done
+set -- "${POSITIONAL[@]}" # restore positional parameters
+
+
+# Process and find last executed timestep
+# Extract solution for this timestep into data.in
+MESHDIR=$(findup . -type d -iname "mesh") && [[ -d "$MESHDIR" ]] || die "No mesh dir found!"
+minffile="$MESHDIR/minf" && [[ -f "$minffile" ]] || die "No minf file found!"
 echo "Using $minffile"
 NN=$(awk '/^nn/{print $2}' "$minffile")
-NREC=$(( $(stat --printf="%s" data.all) / ( NN * 2 * 8 ) ))
+
+[[ -f data.all ]] || die "No data.all found!"
+NREC=$(( $(stat --printf="%s" data.all) / ( NN * NDF * 8 ) ))
 echo "Found $NREC records in data.all"
+
 LASTREC=$(( $NREC - 1 ))
 echo "Extracting last timestep: $LASTREC"
-extractTS -m "$minffile" -f data.all -n 2 -o data.in -t "$LASTREC"
+extractTS -m "$minffile" -f data.all -n $NDF -o data.in -t "$LASTREC"
 
-mkdir "$DIR"
-mv chromatogram data.all out-* xns.log "$DIR"
-cp xns.in "$DIR"
-cp .xns.time "$DIR"
+## Calculate and create target directory run_\d\d
+while IFS= read -r idx; do
+    last_idx=$(filter_integer $idx)
+    if [ -n $last_idx ]; then
+        DIR_IDX=$last_idx
+    fi
+done <<< "$OLD_DIRS_IDX"
+((DIR_IDX++))
+DIR="run_$(printf '%02d\n' $DIR_IDX)"
+
+mkdir -p "$DIR"
+while [[ $? != 0 ]]; do
+    echo "ERROR: couldn't create directory $DIR"
+    echo "       incrementing index"
+    ((DIR_IDX++))
+    DIR="run_$(printf '%02d\n' $DIR_IDX)"
+    mkdir -p "$DIR"
+done
+echo "created dir: $DIR"
+
+## Move solution and log files
+MV_FILES=(chromatogram data.all xns.log)
+for mvfile in "${MV_FILES[@]}" ; do
+    if [ -f "$mvfile" ]; then 
+        mv "$mvfile" "$DIR"
+    fi
+done
+
+## copy config files
+CP_FILES=(xns.in xns.flow.in xns.mass.in .xns.time)
+for cpfile in "${CP_FILES[@]}" ; do
+    if [ -f "$cpfile" ]; then
+        cp "$cpfile" "$DIR"
+    fi
+done
 
 starttime=$(cat .xns.time)
-
+## WARNING: config file has to be xns.in
 sed -i '/^restart/c\restart on' xns.in
 sed -i "/^starttime/c\starttime $starttime" xns.in
