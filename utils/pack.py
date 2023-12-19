@@ -56,6 +56,9 @@ class Bead:
     def volume(self):
         return 4/3 * np.pi * self.r**3
 
+    def surface_area(self):
+        return 4 * np.pi * self.r**2
+
     def distance(self, other):
         return sqrt((self.x-other.x)**2 + (self.y-other.y)**2 + (self.z-other.z)**2)
 
@@ -78,6 +81,9 @@ class PackedBed:
         for bead in self.beads:
             vol = vol + bead.volume()
         return vol
+
+    def surface_area(self):
+        return sum([bead.surface_area() for bead in self.beads])
 
     def updateBounds(self):
         """
@@ -428,6 +434,7 @@ def main():
     print("Bed Height (zmax - zmin):", hBed)
     print("Inlet length till bead zBot: ", inlet)
     print("Outlet length till bead zBot: ", outlet)
+    print("Bed surface area: ", fullBed.surface_area())
 
     # print("Cylinder Volume:", fullBed.CylinderVolume)
     # print("Packed Bed Volume:", fullBed.volume())
