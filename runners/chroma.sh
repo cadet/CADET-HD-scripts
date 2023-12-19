@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 
-## Redoing chroma python script because it's too complicated.
+# The chroma script to handle simulation workflow was unnecessarily complicated
+# Since my experience in bash is now better than a few years ago, here's a simpler 
+# script that is better suited to the job. It should also make more sense to readers.
+
+# Usage: ./chroma.sh -n 1280 -ddp "srun -A jibg12 -N1 -n48 -p dc-cpu-devel" mesh_column.msh2
 
 filter_integer() {
     if [[ $1 =~ ^[[:digit:]]+$ ]]; then
@@ -15,7 +19,7 @@ function proclaim()
     echo "################################################################################"
 }
 
-center_and_fold() {
+function center_and_fold() {
     local string="$1"
     local length=${#string}
     local block_size=80
@@ -83,6 +87,7 @@ function handle_flow_periodicity()
     fi
 }
 
+# Globals
 PERIODICITY=
 NMESHPARTS=
 ETYPE=tet && NEN=4 && MESH_ORDER=1
