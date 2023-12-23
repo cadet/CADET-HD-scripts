@@ -21,6 +21,7 @@ mkdir -p .jobs
 
 SCRIPT_PATH=$(readlink -f -- "$BASH_SOURCE")
 
+CPU_CORE_RATIO=2        # If hyperthreading is on: 2, else 1
 COMMAND=""
 PROMPT=true
 EDIT=true
@@ -87,6 +88,7 @@ do
             tmp=$(ls -At .jobs/*.job | fuzscope)
             jobid=$(basename "${tmp%%.job}")
             jobcputime=$(sacct -j "$jobid" -n -o CPUTimeRAW | head -n 1)
+            jobcputime=$(( jobcputime / CPU_CORE_RATIO / 3600 ))
             monthly=$(/usr/libexec/jutil-exe user cpuquota -u rao2 | grep coreh-quota-monthly | cut -d '=' -f2)
             monthly=${monthly%.*}
             monthly_percent=$(( (jobcputime * 100) / monthly ))
@@ -102,7 +104,7 @@ do
                 jobcputime=$(sacct -j "$jobid" -n -o CPUTimeRAW | head -n 1)
                 sum=$(( sum + jobcputime ))
             done <<< $(ls -At .jobs/*.job)
-            sum=$(( sum  / 2 / 3600 ))
+            sum=$(( sum  / CPU_CORE_RATIO / 3600 ))
             monthly=$(/usr/libexec/jutil-exe user cpuquota -u rao2 | grep coreh-quota-monthly | cut -d '=' -f2)
             monthly=${monthly%.*}
             monthly_percent=$(( (sum * 100) / monthly ))
