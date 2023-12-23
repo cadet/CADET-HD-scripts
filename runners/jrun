@@ -73,6 +73,12 @@ do
             tail -F $job_ids
             exit
             ;;
+        -tre|--tail-running-err)
+            job_ids=$(find .jobs -iname '*.job' -printf "%P" | sed 's/.job/|/g' )
+            job_ids=$(squeue -u rao2 -h | grep -P ${job_ids%%|} | awk '{print $1}' | sed 's/^/.jobs\//;s/$/.err/')
+            tail -F $job_ids
+            exit
+            ;;
         -r|--running)
             job_ids=$(find .jobs -iname '*.job' -printf "%P" | sed 's/.job/|/g' )
             squeue -u rao2 -h | grep -P ${job_ids%%|}
