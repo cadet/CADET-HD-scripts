@@ -81,7 +81,18 @@ do
             sacct -j "$jobid" -o NTasks,AllocCPUS,Elapsed 
             exit
             ;;
-        -aa|--all-account)
+        -q|--quota)
+            tmp=$(ls -At .jobs/*.job | fuzscope)
+            jobid=$(basename "${tmp%%.job}")
+            jobcputime=$(sacct -j "$jobid" -n -o CPUTimeRAW | head -n 1)
+            monthly=$(/usr/libexec/jutil-exe user cpuquota -u rao2 | grep coreh-quota-monthly | cut -d '=' -f2)
+            monthly=${monthly%.*}
+            monthly_percent=$(( (jobcputime * 100) / monthly ))
+            echo "Core-h: $jobcputime"
+            echo "Monthly quota fraction: $monthly_percent%"
+            exit
+            ;;
+        -qa|--quota-all)
             sum=0
             while IFS= read -r jobfile; do
                 jobid=$(basename "${jobfile%%.job}")
