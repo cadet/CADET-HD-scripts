@@ -42,6 +42,11 @@ do
             shift # past value
             shift # past value
             ;;
+        -x|--xns-conf)
+            XNS_CONF_FILE=$2
+            shift # past value
+            shift # past value
+            ;;
         *)    # unknown option
             POSITIONAL+=("$1") # save it in an array for later
             shift # past argument
