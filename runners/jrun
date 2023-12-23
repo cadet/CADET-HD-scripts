@@ -28,6 +28,8 @@ INJOBFILE=""
 NPROC=48
 NTPN=48         # Num Tasks Per Node
 MODE="VIS"
+TIME=24:00:00
+DEP_JOB=""
 
 POSITIONAL=()
 while [[ $# -gt 0 ]]
@@ -152,6 +154,16 @@ do
             shift
             shift
             ;;
+        -T|--time)
+            TIME=$2
+            shift
+            shift
+            ;;
+        -d|--dependency)
+            DEP_JOB=$2
+            shift
+            shift
+            ;;
         -x|--xns)
             MODE="XNS"
             shift
@@ -178,11 +190,10 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 read -r -d '' HEADER << EOFMARKER
 #!/usr/bin/env bash
 
-##SBATCH -d afterany:8602421
 #SBATCH -J HDChroma
 #SBATCH -n $NPROC
 #SBATCH --ntasks-per-node=$NTPN
-#SBATCH --time=24:00:00
+#SBATCH --time=$TIME
 #SBATCH --partition=dc-cpu
 
 #SBATCH -A jibg12
@@ -192,6 +203,13 @@ read -r -d '' HEADER << EOFMARKER
 ##SBATCH --mail-user=jayghosh.rao@rwth-aachen.de
 
 EOFMARKER
+
+if [[ -n "$DEP_JOB" ]] ; then
+read -r -d '' DEPENDS << EOFMARKER
+#SBATCH -d afterany:$DEP_JOB
+
+EOFMARKER
+fi
 
 if [[ $MODE == "VIS" ]]; then 
 read -r -d '' CMDS << EOFMARKER
@@ -208,7 +226,7 @@ srun -n $NPROC --ntasks-per-node=$NTPN ~/bin/xns-mpi-2022-06-25 < xns.in
 EOFMARKER
 fi
 
-JOBSCRIPT=$(echo -e "$HEADER\n\n$CMDS")
+JOBSCRIPT=$(echo -e "$HEADER\n$DEPENDS\n\n$CMDS")
 
 if [ -n "$1" ]; then
     INJOBFILE="$1"
