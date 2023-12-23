@@ -29,6 +29,7 @@ filter_integer() {
 }
 
 NDF=2
+XNS_CONF_FILE=xns.in
 
 ## Commandline args processing
 POSITIONAL=()
@@ -89,6 +90,5 @@ for cpfile in "${CP_FILES[@]}" ; do
     fi
 done
 
-## WARNING: config file has to be xns.in
-sed -i '/^restart/c\restart on' xns.in
-sed -i "/^starttime/c\starttime $STARTTIME" xns.in
+sed -i '/^restart/c\restart on' $XNS_CONF_FILE
+sed -i "/^starttime/c\starttime $STARTTIME" $XNS_CONF_FILE
