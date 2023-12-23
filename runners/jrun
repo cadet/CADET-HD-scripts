@@ -81,6 +81,22 @@ do
             sacct -j "$jobid" -o NTasks,AllocCPUS,Elapsed 
             exit
             ;;
+        -aa|--all-account)
+            sum=0
+            while IFS= read -r jobfile; do
+                jobid=$(basename "${jobfile%%.job}")
+                # sacct -j "$jobid" -o NTasks,AllocCPUS,Elapsed,CPUTime,CPUTimeRAW,MaxRSS,MaxRSSNode,MaxRSSTask,NCPUS
+                jobcputime=$(sacct -j "$jobid" -n -o CPUTimeRAW | head -n 1)
+                sum=$(( sum + jobcputime ))
+            done <<< $(ls -At .jobs/*.job)
+            sum=$(( sum  / 2 / 3600 ))
+            monthly=$(/usr/libexec/jutil-exe user cpuquota -u rao2 | grep coreh-quota-monthly | cut -d '=' -f2)
+            monthly=${monthly%.*}
+            monthly_percent=$(( (sum * 100) / monthly ))
+            echo "Core-h: $sum"
+            echo "Monthly quota fraction: $monthly_percent%"
+            exit
+            ;;
         -lo|--show-last-out)
             less $(ls -At .jobs/*.out | head -n1)
             exit
