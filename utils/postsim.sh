@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 ## Postsim script
 # Run this after a simulation run in order to make restarting easy
 # Copies results into a subdirectory, modifies xns.in and .xns.time files to appropriate time
@@ -30,12 +29,6 @@ filter_integer() {
 }
 
 NDF=2
-DIR_IDX=0
-
-## Find existing directories with the name run_*
-OLD_DIRS=$(find . -type d -name 'run_*' -printf "%P\n")
-OLD_DIRS_IDX=$(echo "$OLD_DIRS" | sed 's/run_//')
-## Trim and list indices only
 
 ## Commandline args processing
 POSITIONAL=()
@@ -72,24 +65,12 @@ LASTREC=$(( $NREC - 1 ))
 echo "Extracting last timestep: $LASTREC"
 extractTS -m "$minffile" -f data.all -n $NDF -o data.in -t "$LASTREC"
 
-## Calculate and create target directory run_\d\d
-while IFS= read -r idx; do
-    last_idx=$(filter_integer $idx)
-    if [ -n $last_idx ]; then
-        DIR_IDX=$last_idx
-    fi
-done <<< "$OLD_DIRS_IDX"
-((DIR_IDX++))
-DIR="run_$(printf '%02d\n' $DIR_IDX)"
+STARTTIME=$(cat .xns.time)
+DIR_PREFIX=$(date '+%Y_%m_%d_%H_%M')
+STARTTIME_TRIMMED=$(echo "$starttime" | tr -d '[:blank:]')
+DIR="${DIR_PREFIX}_${STARTTIME_TRIMMED%.*}_${NREC}"
 
-mkdir -p "$DIR"
-while [[ $? != 0 ]]; do
-    echo "ERROR: couldn't create directory $DIR"
-    echo "       incrementing index"
-    ((DIR_IDX++))
-    DIR="run_$(printf '%02d\n' $DIR_IDX)"
-    mkdir -p "$DIR"
-done
+mkdir "$DIR"
 echo "created dir: $DIR"
 
 ## Move solution and log files
@@ -108,7 +89,6 @@ for cpfile in "${CP_FILES[@]}" ; do
     fi
 done
 
-starttime=$(cat .xns.time)
 ## WARNING: config file has to be xns.in
 sed -i '/^restart/c\restart on' xns.in
-sed -i "/^starttime/c\starttime $starttime" xns.in
+sed -i "/^starttime/c\starttime $STARTTIME" xns.in
