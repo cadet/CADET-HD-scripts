@@ -92,6 +92,7 @@ do
             monthly=$(/usr/libexec/jutil-exe user cpuquota -u rao2 | grep coreh-quota-monthly | cut -d '=' -f2)
             monthly=${monthly%.*}
             monthly_percent=$(( (jobcputime * 100) / monthly ))
+            echo "JobID: $jobid"
             echo "Core-h: $jobcputime"
             echo "Monthly quota fraction: $monthly_percent%"
             exit
