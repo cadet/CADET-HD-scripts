@@ -220,6 +220,12 @@ read -r -d '' DEPENDS << EOFMARKER
 EOFMARKER
 fi
 
+read -r -d '' ENVIRONMENT << EOFMARKER
+source /p/software/jurecadc/lmod/8.4.1/init/zsh
+export MODULEPATH=/p/project/cjibg12/modulefiles:/p/software/jurecadc/supercomputer_modules:/p/software/jurecadc/productionstages
+module load Stages/2022
+EOFMARKER
+
 if [[ $MODE == "VIS" ]]; then 
 read -r -d '' CMDS << EOFMARKER
 module load paraview/5.10.1 paravision
@@ -235,7 +241,7 @@ srun -n $NPROC --ntasks-per-node=$NTPN ~/bin/xns-mpi-2022-06-25 < xns.in
 EOFMARKER
 fi
 
-JOBSCRIPT=$(echo -e "$HEADER\n$DEPENDS\n\n$CMDS")
+JOBSCRIPT=$(echo -e "$HEADER\n$DEPENDS\n\n$ENVIRONMENT\n$CMDS")
 
 if [ -n "$1" ]; then
     INJOBFILE="$1"
