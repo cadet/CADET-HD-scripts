@@ -111,7 +111,7 @@ def main():
 
             # The velocity calculated is averaged over an infinitesimal volume, not calculated at a cross section. And the porosity is inherent to the geometry. 
             flowrate = areas * u * eps
-            # csvWriter(f'flowrates_{f}_new.csv',r,flowrate)
+            csvWriter(f'flowrates_{f}_new.csv',r,flowrate)
             print(sum(flowrate))
 
 if __name__ == "__main__":
