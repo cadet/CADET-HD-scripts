@@ -82,8 +82,6 @@ function run_simulation_stage_on_remote()
     local SIM_STAGE_UPPER=$(echo "$SIM_STAGE" | tr '[:lower:]' '[:upper:]')
     local SIM_STAGE_LOWER=$(echo "$SIM_STAGE" | tr '[:upper:]' '[:lower:]')
 
-    decompose_mesh "$SIM_STAGE"
-
     ensure_files "xns.${SIM_STAGE_LOWER}.in"
 
     mkdir "$SIM_STAGE_UPPER/$SIM_DIR"
@@ -212,6 +210,7 @@ function driver()
         generate_mesh
         prepare_mesh
         for SIM_STAGE in ${SIM_STAGES[@]}; do 
+            decompose_mesh "$SIM_STAGE"
             run_simulation_stage_on_remote "$SIM_STAGE" "$SIM_NAME"
             wait_for_results "$SIM_STAGE" "$SIM_NAME"
             convert_results "$SIM_STAGE" "$SIM_NAME"
