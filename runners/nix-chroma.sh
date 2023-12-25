@@ -161,7 +161,7 @@ function generate_mesh()
 
 }
 
-function decompose_mesh()
+function prepare_mesh()
 {
     [[ -f mesh_column.msh2 ]] || die "No such file: mesh_column.msh2"
     if ! $(check_files FLOW/mesh/{mxyz,mien,mrng,minf} MASS/mesh/{mxyz,mien,mrng,minf}) ; then
@@ -177,12 +177,12 @@ function driver()
 
     if [[ "$MODE" == "MESH" ]]; then
         generate_mesh
-    elif [[ "$MODE" == "DECOMPOSE" ]]; then
+    elif [[ "$MODE" == "PREPARE" ]]; then
         generate_mesh
-        decompose_mesh
+        prepare_mesh
     elif [[ "$MODE" == "RUN" ]]; then
         generate_mesh
-        decompose_mesh
+        prepare_mesh
         for SIM_STAGE in ${SIM_STAGES[@]}; do 
             run_simulation_stage_on_remote "$SIM_STAGE" "$SIM_NAME"
             wait_for_results "$SIM_STAGE" "$SIM_NAME"
@@ -227,8 +227,8 @@ do
             MODE="MESH"
             shift
             ;;
-        -d|--decompose)
-            MODE="DECOMPOSE"
+        -p|--prepare)
+            MODE="PREPARE"
             shift
             ;;
         -w|--wait)
