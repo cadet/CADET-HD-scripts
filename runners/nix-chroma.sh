@@ -127,7 +127,7 @@ function convert_results()
     local SIM_STAGE_LOWER=$(echo "$SIM_STAGE" | tr '[:upper:]' '[:lower:]')
 
     proclaim "Converting results"
-    [ -f "$SIM_STAGE_UPPER/$SIM_DIR/mixd2pvtu" ] || die "No mixd2pvtu file found in dir: $SIM_STAGE_UPPER/$SIM_DIR"
+    [ -f "$SIM_STAGE_UPPER/$SIM_DIR/mixd2pvtu.in" ] || die "No mixd2pvtu file found in dir: $SIM_STAGE_UPPER/$SIM_DIR"
 
     cd "$SIM_STAGE_UPPER/$SIM_DIR"
     ensure_run mixd2pvtu mixd2pvtu.in
