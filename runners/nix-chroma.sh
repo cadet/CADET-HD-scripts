@@ -164,7 +164,7 @@ function generate_mesh()
 function prepare_mesh()
 {
     [[ -f mesh_column.msh2 ]] || die "No such file: mesh_column.msh2"
-    if ! $(check_files FLOW/mesh/{mxyz,mien,mrng,minf} MASS/mesh/{mxyz,mien,mrng,minf}) ; then
+    if ! check_files FLOW/mesh/{mxyz,mien,mrng,minf} MASS/mesh/{mxyz,mien,mrng,minf} ; then
         # TODO: Ensure chroma.sh is error-code compliant. 
         # TODO: Ensure that all component tools are error-code compliant
         chroma.sh mesh_column.msh2 -n $NMESHPARTS -l 
