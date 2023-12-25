@@ -82,6 +82,8 @@ function run_simulation_stage_on_remote()
     local SIM_STAGE_UPPER=$(echo "$SIM_STAGE" | tr '[:lower:]' '[:upper:]')
     local SIM_STAGE_LOWER=$(echo "$SIM_STAGE" | tr '[:upper:]' '[:lower:]')
 
+    decompose_mesh "$SIM_STAGE"
+
     ensure_files "xns.${SIM_STAGE_LOWER}.in"
 
     mkdir "$SIM_STAGE_UPPER/$SIM_DIR"
@@ -110,6 +112,7 @@ function wait_for_results()
 
     proclaim "Waiting for simulation on $REMOTE"
     mirror pull $REMOTE -y
+    # TODO: Better check with jrun
     while [[ ! -f "$SIM_STAGE_UPPER/$SIM_DIR/data.out" ]]
     do
         echo "No simulation results found, waiting $SIM_COMPLETION_CHECK_TIME before trying again"
@@ -171,6 +174,31 @@ function prepare_mesh()
     fi
 }
 
+function decompose_mesh()
+{
+    local SIM_STAGE="$1"
+    local SIM_DIR="$2"
+
+    local SIM_STAGE_UPPER=$(echo "$SIM_STAGE" | tr '[:lower:]' '[:upper:]')
+    local SIM_STAGE_LOWER=$(echo "$SIM_STAGE" | tr '[:upper:]' '[:lower:]')
+
+    NMP_04=$(printf "%04d\n" "$NMESHPARTS") 
+    local SPACETIME_ARG=
+    [[ "$SIM_STAGE_UPPER" == "MASS" ]] && SPACETIME_ARG="-s"
+
+    cd "${SIM_STAGE_UPPER}/mesh"
+
+    if ! check_files neim ; then
+        gendual -e "$ETYPE" && genneim --nen "$NEN" "$SPACETIME_ARG"
+    fi
+
+    if ! check_files {mprm,nprm}.${NMP_04} ; then
+        "$DECOMPOSE_COMMAND" -e "$ETYPE" -p "$NMESHPARTS" -w $SPACETIME_ARG
+    fi
+
+    cd "$BASE"
+}
+
 function driver()
 {
     ## This function uses globals only
@@ -206,6 +234,8 @@ SIM_COMPLETION_CHECK_TIME=60
 SIM_NAME="sim"
 SIM_STAGES=(FLOW MASS)
 MODE="RUN"
+DECOMPOSE_COMMAND="decompose.metis"
+ETYPE=tet && NEN=4 && MESH_ORDER=1
 
 ## Commandline args processing
 POSITIONAL=()
