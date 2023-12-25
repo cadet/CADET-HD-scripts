@@ -1,4 +1,4 @@
-#!/usr/bin/env -S nix develop --impure /home/jayghoshter/templates/nix-flakes/pymesh/flake.nix --command zsh
+#!/usr/bin/env -S nix develop --impure /home/jayghoshter/dev/tools/pymesh/flake.nix --command zsh
 
 filter_integer() {
     if [[ $1 =~ ^[[:digit:]]+$ ]]; then
@@ -151,24 +151,38 @@ function mapflow_wrapper()
     cd "$BASE"
 }
 
-function driver()
+function generate_mesh()
 {
-    ## This function uses globals only
-
     if [[ ! -f mesh_column.msh2 ]]; then
         proclaim "Generating mesh"
         ensure_run mesh input.yaml
     fi
 
-    [[ -f mesh_column.msh2 ]] || die "No such file: mesh_column.msh2"
 
+}
+
+function decompose_mesh()
+{
+    [[ -f mesh_column.msh2 ]] || die "No such file: mesh_column.msh2"
     if ! $(check_files FLOW/mesh/{mxyz,mien,mrng,minf} MASS/mesh/{mxyz,mien,mrng,minf}) ; then
         # TODO: Ensure chroma.sh is error-code compliant. 
         # TODO: Ensure that all component tools are error-code compliant
         chroma.sh mesh_column.msh2 -n $NMESHPARTS -l 
     fi
+}
 
-    if [[ "$MODE" == "RUN" ]]; then
+function driver()
+{
+    ## This function uses globals only
+
+    if [[ "$MODE" == "MESH" ]]; then
+        generate_mesh
+    elif [[ "$MODE" == "DECOMPOSE" ]]; then
+        generate_mesh
+        decompose_mesh
+    elif [[ "$MODE" == "RUN" ]]; then
+        generate_mesh
+        decompose_mesh
         for SIM_STAGE in ${SIM_STAGES[@]}; do 
             run_simulation_stage_on_remote "$SIM_STAGE" "$SIM_NAME"
             wait_for_results "$SIM_STAGE" "$SIM_NAME"
@@ -208,6 +222,14 @@ do
             SIM_NAME="$2"
             shift # past value
             shift # past value
+            ;;
+        -m|--mesh)
+            MODE="MESH"
+            shift
+            ;;
+        -d|--decompose)
+            MODE="DECOMPOSE"
+            shift
             ;;
         -w|--wait)
             MODE="WAIT"
