@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+
+## Use the following shebang to run the script under a nix develop shell
 #!/usr/bin/env -S nix develop --impure /home/jayghoshter/dev/tools/pymesh/flake.nix --command zsh
 
 filter_integer() {
