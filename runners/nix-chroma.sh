@@ -243,12 +243,18 @@ function driver()
         for SIM_STAGE in ${SIM_STAGES[@]}; do 
             decompose_mesh "$SIM_STAGE"
             run_simulation_stage "$SIM_STAGE" "$SIM_NAME"
+            ## Necessary to wait for FLOW stage results
             wait_for_results "$SIM_STAGE" "$SIM_NAME"
             convert_results "$SIM_STAGE" "$SIM_NAME"
         done
     elif [[ "$MODE" == "WAIT" ]]; then
         for SIM_STAGE in ${SIM_STAGES[@]}; do 
             wait_for_results "$SIM_STAGE" "$SIM_NAME"
+            convert_results "$SIM_STAGE" "$SIM_NAME"
+        done
+    elif [[ "$MODE" == "CONVERT" ]]; then
+        for SIM_STAGE in ${SIM_STAGES[@]}; do 
+            convert_results "$SIM_STAGE" "$SIM_NAME"
         done
     fi
 
@@ -320,6 +326,10 @@ do
             MODE="PREPARE"
             shift
             ;;
+        -c|--convert)
+            MODE="CONVERT"
+            shift
+            ;;
         -d|--dispatch)
             DISPATCH="$2"
             ensure_match "^(JURECA|REMOTE)$" "$DISPATCH"
@@ -344,7 +354,7 @@ if [[ -n "$1" ]]; then
     SIM_STAGES=("$1")
 fi 
 
-ensure_match "^(MESH|PREPARE|RUN|WAIT)$" "$MODE"
+ensure_match "^(MESH|PREPARE|RUN|WAIT|CONVERT)$" "$MODE"
 
 if [[ "$DISPATCH" == "JURECA" ]]; then
     ensure_match "jureca" $(hostname)
