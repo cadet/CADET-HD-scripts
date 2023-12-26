@@ -99,11 +99,11 @@ function run_simulation_stage_on_remote()
 
     [[ "$SIM_STAGE_UPPER" == "MASS" ]] && mapflow_wrapper "$SIM_DIR"
 
-    mirror -m -y --delete push $REMOTE -f "$SIM_STAGE_UPPER"
+    ensure_run mirror -m -y --delete push $REMOTE -f "$SIM_STAGE_UPPER"
 
     proclaim "Submitting job on $REMOTE"
     cd "$SIM_STAGE_UPPER/$SIM_DIR"
-    mirror cmd 'jrun -x -np '$NMESHPARTS' -n -ne' --target $REMOTE
+    ensure_run mirror cmd 'jrun -x -np '$NMESHPARTS' -n -ne' --target $REMOTE
     cd "$BASE"
 
 }
@@ -177,7 +177,7 @@ function prepare_mesh()
     if ! check_files FLOW/mesh/{mxyz,mien,mrng,minf} MASS/mesh/{mxyz,mien,mrng,minf} ; then
         # TODO: Ensure chroma.sh is error-code compliant. 
         # TODO: Ensure that all component tools are error-code compliant
-        chroma.sh mesh_column.msh2 -n $NMESHPARTS -l 
+        ensure_run chroma.sh mesh_column.msh2 -n $NMESHPARTS -l 
     fi
 }
 
@@ -196,11 +196,11 @@ function decompose_mesh()
     cd "${SIM_STAGE_UPPER}/mesh"
 
     if ! check_files neim ; then
-        gendual -e "$ETYPE" && genneim --nen "$NEN" "$SPACETIME_ARG"
+        ensure run gendual -e "$ETYPE" && genneim --nen "$NEN" "$SPACETIME_ARG"
     fi
 
     if ! check_files {mprm,nprm}.${NMP_04} ; then
-        "$DECOMPOSE_COMMAND" -e "$ETYPE" -p "$NMESHPARTS" -w $SPACETIME_ARG
+        ensure_run "$DECOMPOSE_COMMAND" -e "$ETYPE" -p "$NMESHPARTS" -w $SPACETIME_ARG
     fi
 
     cd "$BASE"
