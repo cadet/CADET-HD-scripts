@@ -346,4 +346,8 @@ fi
 
 ensure_match "^(MESH|PREPARE|RUN|WAIT)$" "$MODE"
 
+if [[ "$DISPATCH" == "JURECA" ]]; then
+    ensure_match "jureca" $(hostname)
+fi
+
 driver
