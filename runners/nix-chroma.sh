@@ -91,6 +91,7 @@ function run_simulation_stage_on_remote()
     local SIM_STAGE_LOWER=$(echo "$SIM_STAGE" | tr '[:upper:]' '[:lower:]')
 
     ensure_files "xns.${SIM_STAGE_LOWER}.in"
+    ensure_dirs "$SIM_STAGE_UPPER"/{,mesh}
 
     mkdir "$SIM_STAGE_UPPER/$SIM_DIR"
     [ -f "xns.${SIM_STAGE_LOWER}.in" ] && cp "xns.${SIM_STAGE_LOWER}.in" $SIM_STAGE_UPPER/$SIM_DIR/xns.in
