@@ -103,7 +103,7 @@ function run_simulation_stage_on_remote()
 
     proclaim "Submitting job on $REMOTE"
     cd "$SIM_STAGE_UPPER/$SIM_DIR"
-    ensure_run mirror cmd 'jrun -x -np '$NMESHPARTS' -n -ne' --target $REMOTE
+    ensure_run mirror cmd 'jrun -x -nt '$NTPN' -np '$NMESHPARTS' -n -ne' --target $REMOTE
     cd "$BASE"
 
 }
@@ -239,6 +239,7 @@ function driver()
 }
 
 ## Globals
+NTPN=128
 NMESHPARTS=48
 BASE="$PWD"
 REMOTE="jureca"
@@ -257,6 +258,11 @@ do
     case $key in
         -n|--nmeshparts)
             NMESHPARTS="$2"
+            shift # past value
+            shift # past value
+            ;;
+        -nt|--ntpn)
+            NTPN="$2"
             shift # past value
             shift # past value
             ;;
