@@ -163,8 +163,9 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 
 if [[ $(hostname) =~ "jureca" ]]; then 
     export MODULEPATH=/p/project/cjibg12/modulefiles:/p/software/jurecadc/supercomputer_modules:/p/software/jurecadc/productionstages
-    module load Stages/2022
-    module load GCC/11.2.0 ParaStationMPI/5.5.0-1 ParMETIS/4.0.3-double Boost/1.78.0 VTK/9.1.0 flex/2.6.4  
+    # module load Stages/2022
+    # module load GCC/11.2.0 ParaStationMPI/5.5.0-1 ParMETIS/4.0.3-double Boost/1.78.0 VTK/9.1.0 flex/2.6.4  
+    module load GCC/12.3.0 ParaStationMPI/5.9.2-1 ParMETIS/4.0.3-double Boost/1.82.0 VTK/9.1.0 flex/2.6.4
 fi
 
 ## Cleanup
