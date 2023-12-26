@@ -196,7 +196,7 @@ spacetimeify mprd
 cp minf minf.space
 NN=$(awk '/^nn/{print $2}' minf)
 NNST=$(( NN * 2 ))
-sed -i 's/nn/# nn' minf
+sed -i 's/nn/# nn/' minf
 echo "nn     $NNST" >> minf
 
 proclaim "Moving mesh files"
