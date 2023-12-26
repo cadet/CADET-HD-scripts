@@ -297,6 +297,8 @@ JOB_ID=
 DECOMPOSE_COMMAND="decompose.metis"
 ETYPE=tet && NEN=4 && MESH_ORDER=1
 
+SOFTWARE_STAGE=2022
+
 ## Commandline args processing
 POSITIONAL=()
 while [[ $# -gt 0 ]]
@@ -358,6 +360,23 @@ ensure_match "^(MESH|PREPARE|RUN|WAIT|CONVERT)$" "$MODE"
 
 if [[ "$DISPATCH" == "JURECA" ]]; then
     ensure_match "jureca" $(hostname)
+fi
+
+if [[ $(hostname) =~ "jureca" ]]; then 
+    source /p/software/jurecadc/lmod/8.4.1/init/zsh
+    export MODULEPATH=/p/project/cjibg12/modulefiles:/p/software/jurecadc/supercomputer_modules:/p/software/jurecadc/productionstages
+
+    if [[ "$SOFTWARE_STAGE" == 2022 ]]; then
+        ## Unfortunately, on JURECA, ParMETIS-double is only available on 2022 stage
+        ## So we use this as the default
+        module load Stages/2022 GCC/11.2.0 ParaStationMPI/5.5.0-1 ParMETIS/4.0.3-double Boost/1.78.0 VTK/9.1.0 flex/2.6.4  
+    elif [[ "$SOFTWARE_STAGE" == 2024 ]]; then
+        module load Stages/2024 GCC/12.3.0 ParaStationMPI/5.9.2-1 ParMETIS/4.0.3 Boost/1.82.0 VTK/9.3.0 flex/2.6.4
+    fi
+
+    # for pymesh
+    module load gmsh/4.11.0-2ac03e-copymesh.lua
+    source ~/cjibg12/miniconda3/bin/activate dev 
 fi
 
 driver
