@@ -1,10 +1,12 @@
 SCRIPTS=$(shell find postproc runners utils -type f) 
 
-prefix?=$(HOME)/local/chromahd
+PREFIX?=$(HOME)/local/chromahd
 
 all: install
 
 install: 
-	mkdir -p $(prefix)
-	cp $(SCRIPTS) $(prefix)
-	echo installed to $(prefix)
+	@mkdir -p $(PREFIX)
+	@for script in $(SCRIPTS); do \
+		ln -sfn $(PWD)/$$script $(PREFIX)/; \
+	done
+	@echo installed to $(PREFIX)
