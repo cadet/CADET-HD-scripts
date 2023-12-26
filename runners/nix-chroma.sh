@@ -118,13 +118,18 @@ function wait_for_results()
     local SIM_STAGE_LOWER=$(echo "$SIM_STAGE" | tr '[:upper:]' '[:lower:]')
 
     proclaim "Waiting for simulation on $REMOTE"
+
+    cd "$SIM_STAGE_UPPER/$SIM_DIR"
+    
     mirror pull $REMOTE -y
     while mirror cmd 'jrun --running' --target "$REMOTE"
     do
         echo "No simulation results found, waiting $SIM_COMPLETION_CHECK_TIME before trying again"
         sleep $SIM_COMPLETION_CHECK_TIME
-        mirror pull $REMOTE -f "$SIM_STAGE_UPPER" -y
+        mirror pull $REMOTE -y
     done
+
+    cd "$BASE"
 }
 
 function convert_results()
