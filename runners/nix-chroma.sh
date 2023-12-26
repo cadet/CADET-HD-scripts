@@ -80,7 +80,7 @@ function ensure_dirs()
     done
 }
 
-function run_simulation_stage_on_remote()
+function run_simulation_stage()
 {
     local SIM_STAGE="$1"
     local SIM_DIR="$2"
@@ -102,13 +102,19 @@ function run_simulation_stage_on_remote()
 
     [[ "$SIM_STAGE_UPPER" == "MASS" ]] && mapflow_wrapper "$SIM_DIR"
 
-    ensure_run mirror -m -y --delete push $REMOTE -f "$SIM_STAGE_UPPER"
-
-    proclaim "Submitting job on $REMOTE"
-    cd "$SIM_STAGE_UPPER/$SIM_DIR"
-    ensure_run mirror cmd 'jrun -x -nt '$NTPN' -np '$NMESHPARTS' -n -ne' --target $REMOTE
-    cd "$BASE"
-
+    if [[ "$DISPATCH" == "REMOTE" ]] ; then 
+        ensure_run mirror -m -y --delete push $REMOTE -f "$SIM_STAGE_UPPER"
+        proclaim "Submitting job on $REMOTE"
+        cd "$SIM_STAGE_UPPER/$SIM_DIR"
+        local JRUN_OUT=$(ensure_run mirror cmd 'jrun -x -nt '$NTPN' -np '$NMESHPARTS' -n -ne' --target $REMOTE)
+        JOB_ID=$(echo JRUN_OUT | tail -n 1 | grep Submitted | awk '{print $2}')
+        cd "$BASE"
+    elif [[ "$DISPATCH" == "JURECA" ]] ; then
+        cd "$SIM_STAGE_UPPER/$SIM_DIR"
+        local JRUN_OUT=$(jrun -x -nt $NTPN -np $NMESHPARTS -n -ne)
+        JOB_ID=$(echo JRUN_OUT | tail -n 1 | grep Submitted | awk '{print $2}')
+        cd "$BASE"
+    fi
 }
 
 function wait_for_results()
@@ -120,17 +126,26 @@ function wait_for_results()
     local SIM_STAGE_UPPER=$(echo "$SIM_STAGE" | tr '[:lower:]' '[:upper:]')
     local SIM_STAGE_LOWER=$(echo "$SIM_STAGE" | tr '[:upper:]' '[:lower:]')
 
-    proclaim "Waiting for simulation on $REMOTE"
+    [[ -n "$JOB_ID" ]] || die "Please provide a JOB_ID to wait for"
+    proclaim "Waiting for simulation"
 
     cd "$SIM_STAGE_UPPER/$SIM_DIR"
     
-    mirror pull $REMOTE -y
-    while mirror cmd 'jrun --running' --target "$REMOTE"
-    do
-        echo "No simulation results found, waiting $SIM_COMPLETION_CHECK_TIME before trying again"
-        sleep $SIM_COMPLETION_CHECK_TIME
+    if [[ "$DISPATCH" == "REMOTE" ]] ; then 
         mirror pull $REMOTE -y
-    done
+        while mirror cmd "jrun --is-queued $JOB_ID" --target "$REMOTE"
+        do
+            echo "Job $JOB_ID is still queued. Waiting $SIM_COMPLETION_CHECK_TIME seconds before checking again."
+            sleep $SIM_COMPLETION_CHECK_TIME
+            mirror pull $REMOTE -y
+        done
+    elif [[ "$DISPATCH" == "JURECA" ]] ; then 
+        while jrun --is-queued "$JOB_ID"
+        do
+            echo "Job $JOB_ID is still queued. Waiting $SIM_COMPLETION_CHECK_TIME seconds before checking again."
+            sleep $SIM_COMPLETION_CHECK_TIME
+        done
+    fi
 
     cd "$BASE"
 }
@@ -227,7 +242,7 @@ function driver()
         prepare_mesh
         for SIM_STAGE in ${SIM_STAGES[@]}; do 
             decompose_mesh "$SIM_STAGE"
-            run_simulation_stage_on_remote "$SIM_STAGE" "$SIM_NAME"
+            run_simulation_stage "$SIM_STAGE" "$SIM_NAME"
             wait_for_results "$SIM_STAGE" "$SIM_NAME"
             convert_results "$SIM_STAGE" "$SIM_NAME"
         done
@@ -242,14 +257,37 @@ function driver()
 }
 
 ## Globals
-NTPN=128
-NMESHPARTS=48
 BASE="$PWD"
+
+## Number of tasks per node to use for XNS job on JURECA
+NTPN=128
+
+## Number of mesh parts, or number of processes to run
+NMESHPARTS=48
+
+## Remote name. Used primarily by `mirror` and `ssh` to sync data and send commands
 REMOTE="jureca"
+
+## Sleep time for checks while waiting for simulation
 SIM_COMPLETION_CHECK_TIME=60
+
+## Name of the simulation to be performed. Uses this as directory name.
 SIM_NAME="sim"
+
+## Simulation stages to perform
 SIM_STAGES=(FLOW MASS)
+
+## MODE can be one of [ MESH, PREPARE, RUN, WAIT ]
 MODE="RUN"
+
+# DISPATCH can be one of [ JURECA , REMOTE, LOCAL ]. 
+# LOCAL => Run locally on a machine/node (NOT IMPLEMENTED YET)
+# REMOTE => Run script locally, sync data to/from remote. Use jrun to submit data. Currently tightly coupled with JURECA.
+# JURECA => Run script locally on JURECA. Submit job with jrun.
+DISPATCH="JURECA" 
+JOB_ID=
+
+## Currently duplicated decomposition from chroma.sh
 DECOMPOSE_COMMAND="decompose.metis"
 ETYPE=tet && NEN=4 && MESH_ORDER=1
 
@@ -282,8 +320,15 @@ do
             MODE="PREPARE"
             shift
             ;;
+        -d|--dispatch)
+            DISPATCH="$2"
+            ensure_match "^(JURECA|REMOTE)$" "$DISPATCH"
+            shift
+            ;;
         -w|--wait)
             MODE="WAIT"
+            JOB_ID=$(filter_integer "$2")
+            [[ -n "$JOB_ID" ]] || die "Bad JOB_ID provided to --wait"
             shift
             ;;
         *)    # unknown option
@@ -298,5 +343,7 @@ if [[ -n "$1" ]]; then
     ensure_match "^(flow|mass|FLOW|MASS)$" "$1"
     SIM_STAGES=("$1")
 fi 
+
+ensure_match "^(MESH|PREPARE|RUN|WAIT)$" "$MODE"
 
 driver
