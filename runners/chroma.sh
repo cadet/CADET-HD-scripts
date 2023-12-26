@@ -172,11 +172,9 @@ if [[ $(hostname) =~ "jureca" ]]; then
     if [[ "$SOFTWARE_STAGE" == 2022 ]]; then
         ## Unfortunately, on JURECA, ParMETIS-double is only available on 2022 stage
         ## So we use this as the default
-        module load Stages/2022
-        module load GCC/11.2.0 ParaStationMPI/5.5.0-1 ParMETIS/4.0.3-double Boost/1.78.0 VTK/9.1.0 flex/2.6.4  
+        module load Stages/2022 GCC/11.2.0 ParaStationMPI/5.5.0-1 ParMETIS/4.0.3-double Boost/1.78.0 VTK/9.1.0 flex/2.6.4  
     elif [[ "$SOFTWARE_STAGE" == 2024 ]]; then
-        module load Stages/2024
-        module load GCC/12.3.0 ParaStationMPI/5.9.2-1 ParMETIS/4.0.3 Boost/1.82.0 VTK/9.3.0 flex/2.6.4
+        module load Stages/2024 GCC/12.3.0 ParaStationMPI/5.9.2-1 ParMETIS/4.0.3 Boost/1.82.0 VTK/9.3.0 flex/2.6.4
     fi
 fi
 
