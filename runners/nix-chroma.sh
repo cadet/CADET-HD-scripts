@@ -218,7 +218,7 @@ function decompose_mesh()
     cd "${SIM_STAGE_UPPER}/mesh"
 
     if ! check_files neim ; then
-        ensure run gendual -e "$ETYPE" && genneim --nen "$NEN" "$SPACETIME_ARG"
+        ensure_run gendual -e "$ETYPE" && genneim --nen "$NEN" "$SPACETIME_ARG"
     fi
 
     if ! check_files {mprm,nprm}.${NMP_04} ; then
