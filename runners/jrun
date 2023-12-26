@@ -85,6 +85,11 @@ do
             squeue -u rao2 -h | grep -P ${job_ids%%|}
             exit
             ;;
+        -iq|--is-queued)
+            [[ -n "$2" ]] || exit -1 
+            squeue -u rao2 -h | grep "$2"
+            [[ $? == 0 ]] && exit || exit -1
+            ;;
         -a|--account)
             tmp=$(ls -At .jobs/*.job | fuzscope)
             jobid=$(basename "${tmp%%.job}")
