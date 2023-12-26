@@ -61,7 +61,7 @@ function ensure_match()
     CMP_STR="$1"
     shift
     for ARG in "$@"; do
-        [[ "$ARG" =~ "$CMP_STR" ]] || die "$ARG doesn't match $CMP_STR"
+        [[ "$ARG" =~ $CMP_STR ]] || die "$ARG doesn't match $CMP_STR"
     done
 }
 
