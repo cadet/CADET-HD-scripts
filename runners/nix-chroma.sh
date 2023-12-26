@@ -119,8 +119,7 @@ function wait_for_results()
 
     proclaim "Waiting for simulation on $REMOTE"
     mirror pull $REMOTE -y
-    # TODO: Better check with jrun
-    while [[ ! -f "$SIM_STAGE_UPPER/$SIM_DIR/data.out" ]]
+    while mirror cmd 'jrun --running' --target "$REMOTE"
     do
         echo "No simulation results found, waiting $SIM_COMPLETION_CHECK_TIME before trying again"
         sleep $SIM_COMPLETION_CHECK_TIME
