@@ -38,6 +38,13 @@ function ensure_run(){
     [[ $? == 0 ]] || die "command exited with error: $@"
 }
 
+function ensure_commands()
+{
+    for ARG in "$@"; do
+        [[ -x $(command -v "$ARG") ]] || die "no such command: $1"
+    done
+}
+
 function ensure_files()
 {
     for ARG in "$@"; do
