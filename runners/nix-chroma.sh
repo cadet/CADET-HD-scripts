@@ -107,12 +107,12 @@ function run_simulation_stage()
         proclaim "Submitting job on $REMOTE"
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         local JRUN_OUT=$(ensure_run mirror cmd 'jrun -x -nt '$NTPN' -np '$NMESHPARTS' -n -ne' --target $REMOTE)
-        JOB_ID=$(echo JRUN_OUT | tail -n 1 | grep Submitted | awk '{print $2}')
+        JOB_ID=$(echo "$JRUN_OUT" | tail -n 1 | grep Submitted | awk '{print $2}')
         cd "$BASE"
     elif [[ "$DISPATCH" == "JURECA" ]] ; then
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         local JRUN_OUT=$(jrun -x -nt $NTPN -np $NMESHPARTS -n -ne)
-        JOB_ID=$(echo JRUN_OUT | tail -n 1 | grep Submitted | awk '{print $2}')
+        JOB_ID=$(echo "$JRUN_OUT" | tail -n 1 | grep Submitted | awk '{print $2}')
         cd "$BASE"
     fi
 }
