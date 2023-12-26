@@ -39,6 +39,13 @@ function die(){
     exit -1
 }
 
+function ensure_commands()
+{
+    for ARG in "$@"; do
+        [[ -x $(command -v "$ARG") ]] || die "no such command: $1"
+    done
+}
+
 function setup_dir()
 {
     [ -d "$1" ] && rm -rf "$1"
@@ -60,6 +67,8 @@ function handle_mass_periodicity()
     ## to just duplicate the semidiscrete data to generate the spacetime data.
     ## So we just generate mtbl and mprd for semidiscrete meshes and then double it.
     ## To be "proper" we'd have to add an offset (nnspace) to the second half of the mtbl/mprd data
+    ensure_commands genmprd
+
     echo "Handling mass periodicity"
     if [[ "$PERIODICITY" == "XY" ]]; then
         genmprd 0 0 x -readmtbl
@@ -75,6 +84,8 @@ function handle_mass_periodicity()
 
 function handle_flow_periodicity()
 {
+    ensure_commands genmprd
+    echo "Handling flow periodicity"
     if [[ "$PERIODICITY" == "XY" ]]; then
         genmprd 0 0 x
         genmprd 0 0 y -readmprd
@@ -167,8 +178,10 @@ setup_dir "$MASS_MESH_DIR"
 proclaim "Starting mesh conversion"
 
 if [[ "$LEGACY_GMSH2MIXD" == 1 ]]; then
+    ensure_commands gmsh2mixd_3D
     gmsh2mixd_3D -d "$PARTICLES_SURFACE_GROUP_IDX" -m sd "$MESHFILE"
 else
+    ensure_commands gmsh2mixdv2
     gmsh2mixdv2 -d "$PARTICLES_SURFACE_GROUP_IDX" -o "$MESH_ORDER" "$MESHFILE"
 fi
 
@@ -204,6 +217,7 @@ cd "$FLOW_MESH_DIR"
 handle_flow_periodicity
 cd $ROOT_DIR
 
+ensure_commands gendual genneim decompose.metis gennmat
 cd "$FLOW_MESH_DIR"
 if [[ -n $(filter_integer "$NMESHPARTS") ]]; then
     proclaim "Partitioning FLOW mesh"
