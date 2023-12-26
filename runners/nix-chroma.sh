@@ -34,6 +34,7 @@ function die(){
 }
 
 function ensure_run(){
+    [ -x $(command -v "$1") ] || die "no such command: $1"
     "$@"
     [[ $? == 0 ]] || die "command exited with error: $@"
 }
