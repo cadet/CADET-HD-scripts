@@ -31,6 +31,7 @@ NTPN=48         # Num Tasks Per Node
 MODE="VIS"
 TIME=24:00:00
 DEP_JOB=""
+XNS_BIN="~/bin/xns-mpi-2022-06-25"
 
 POSITIONAL=()
 while [[ $# -gt 0 ]]
@@ -177,6 +178,11 @@ do
             MODE="XNS"
             shift
             ;;
+        -X|--xns-bin)
+            MODE="XNS"
+            XNS_BIN="$2"
+            shift
+            ;;
         -v|--vis)
             MODE="VIS"
             shift
@@ -237,7 +243,7 @@ fi
 if [[ $MODE == "XNS" ]]; then 
 read -r -d '' CMDS << EOFMARKER
 module load GCC/11.2.0 ParaStationMPI/5.5.0-1 ParMETIS/4.0.3-double Boost/1.78.0 VTK/9.1.0 flex/2.6.4 
-srun -n $NPROC --ntasks-per-node=$NTPN ~/bin/xns-mpi-2022-06-25 < xns.in
+srun -n $NPROC --ntasks-per-node=$NTPN $XNS_BIN < xns.in
 EOFMARKER
 fi
 
