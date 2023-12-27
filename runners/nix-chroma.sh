@@ -362,7 +362,7 @@ if [[ "$DISPATCH" == "JURECA" ]]; then
     ensure_match "^(jureca|jrc.*)$" $(hostname)
 fi
 
-if [[ $(hostname) =~ "^(jureca|jrc.*)$" ]]; then 
+if [[ $(hostname) =~ ^(jureca|jrc.*)$ ]]; then 
     source /p/software/jurecadc/lmod/8.4.1/init/zsh
     export MODULEPATH=/p/project/cjibg12/modulefiles:/p/software/jurecadc/supercomputer_modules:/p/software/jurecadc/productionstages
 
