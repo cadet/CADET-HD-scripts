@@ -359,7 +359,7 @@ fi
 ensure_match "^(MESH|PREPARE|RUN|WAIT|CONVERT)$" "$MODE"
 
 if [[ "$DISPATCH" == "JURECA" ]]; then
-    ensure_match "jureca" $(hostname)
+    ensure_match "^(jureca|jrc.*)$" $(hostname)
 fi
 
 if [[ $(hostname) =~ "jureca" ]]; then 
