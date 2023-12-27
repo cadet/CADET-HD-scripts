@@ -166,7 +166,7 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 
 [ -n "$1" ] && MESHFILE="$1" || die "No mesh file given"
 
-if [[ $(hostname) =~ "jureca" ]]; then 
+if [[ $(hostname) =~ (jureca|jrc.*) ]]; then 
     export MODULEPATH=/p/project/cjibg12/modulefiles:/p/software/jurecadc/supercomputer_modules:/p/software/jurecadc/productionstages
 
     if [[ "$SOFTWARE_STAGE" == 2022 ]]; then
