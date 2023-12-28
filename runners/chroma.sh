@@ -248,5 +248,5 @@ if [[ -n $(filter_integer "$NMESHPARTS") ]]; then
     gendual -e "$ETYPE" && genneim --nen "$NEN" -s
     $DECOMPOSE_COMMAND -e "$ETYPE" -w -p "$NMESHPARTS" -s
 fi
-gennmat 4 st
+gennmat "$NEN" st
 cd "$ROOT_DIR"
