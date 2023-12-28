@@ -240,6 +240,14 @@ function driver()
     elif [[ "$MODE" == "RUN" ]]; then
         generate_mesh
         prepare_mesh
+        local SIM_STAGE="${SIM_STAGES[0]}"
+        echo "WARNING: Due to FLOW -> MESH dependency, RUN mode can only dispatch one simulation stage at a time."
+        echo "WARNING: Running $SIM_STAGE simulation."
+        decompose_mesh "$SIM_STAGE"
+        run_simulation_stage "$SIM_STAGE" "$SIM_NAME"
+    elif [[ "$MODE" == "RUNWAIT" ]]; then
+        generate_mesh
+        prepare_mesh
         for SIM_STAGE in ${SIM_STAGES[@]}; do 
             decompose_mesh "$SIM_STAGE"
             run_simulation_stage "$SIM_STAGE" "$SIM_NAME"
@@ -283,8 +291,8 @@ SIM_NAME="sim"
 ## Simulation stages to perform
 SIM_STAGES=(FLOW MASS)
 
-## MODE can be one of [ MESH, PREPARE, RUN, WAIT ]
-MODE="RUN"
+## MODE can be one of [ MESH, PREPARE, RUN, WAIT, RUNWAIT, CONVERT ]
+MODE="RUNWAIT"
 
 # DISPATCH can be one of [ JURECA , REMOTE, LOCAL ]. 
 # LOCAL => Run locally on a machine/node (NOT IMPLEMENTED YET)
@@ -337,6 +345,10 @@ do
             ensure_match "^(JURECA|REMOTE)$" "$DISPATCH"
             shift
             ;;
+        -r|--run|--no-wait)
+            MODE="RUN"
+            shift
+            ;;
         -w|--wait)
             MODE="WAIT"
             JOB_ID=$(filter_integer "$2")
@@ -356,7 +368,7 @@ if [[ -n "$1" ]]; then
     SIM_STAGES=("$1")
 fi 
 
-ensure_match "^(MESH|PREPARE|RUN|WAIT|CONVERT)$" "$MODE"
+ensure_match "^(MESH|PREPARE|RUN|WAIT|RUNWAIT|CONVERT)$" "$MODE"
 
 if [[ "$DISPATCH" == "JURECA" ]]; then
     ensure_match "(jureca|jrc.*)" $(hostname)
