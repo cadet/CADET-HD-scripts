@@ -4,6 +4,8 @@
 
 Successor to postchrom.py
 
+Usage: postchrom2.py -nt 128 -xf FLOW/sim -xm MASS/sim -c MASS/sim/chromatogram -mc input.yaml -m mesh_column.msh2
+
 """
 
 import sympy as sp
