@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# WARNING: This script is now deprecated. It is superceded by the script currently named nix-chroma.sh
+
 # The chroma script to handle simulation workflow was unnecessarily complicated
 # Since my experience in bash is now better than a few years ago, here's a simpler 
 # script that is better suited to the job. It should also make more sense to readers.
