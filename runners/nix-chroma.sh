@@ -212,6 +212,126 @@ function prepare_mesh()
     fi
 }
 
+function setup_dir()
+{
+    [ -d "$1" ] && rm -rf "$1"
+    mkdir -p "$1"
+}
+
+function spacetimeify()
+{
+    if [[ -f "$1" ]]; then
+        echo "spacetimeifying $1"
+        cp "$1" "${1}.space"
+        cat "${1}.space" >> "$1"
+    fi
+}
+
+function spacetimeify_mesh()
+{
+    echo "Creating spacetime meshes"
+    spacetimeify mxyz
+    spacetimeify mtbl
+    spacetimeify mprd
+
+    # update minf
+    cp minf minf.space
+    NN=$(awk '/^nn/{print $2}' minf)
+    NNST=$(( NN * 2 ))
+    sed -i 's/nn/# nn/' minf
+    echo "nn     $NNST" >> minf
+}
+
+function handle_mass_periodicity()
+{
+    ## Some code in XNS: genmesh.F / genmtbl()/genmprd() etc allows us
+    ## to just duplicate the semidiscrete data to generate the spacetime data.
+    ## So we just generate mtbl and mprd for semidiscrete meshes and then double it.
+    ## To be "proper" we'd have to add an offset (nnspace) to the second half of the mtbl/mprd data
+    ensure_commands genmprd
+    if [[ "$PERIODICITY" == "XY" ]]; then
+        echo "Handling MASS periodicity: $PERIODICITY"
+        genmprd 0 0 x -readmtbl
+        genmprd 0 0 y -readmprd -readmtbl
+    elif [[ "$PERIODICITY" == "XYZ" ]]; then
+        echo "Handling MASS periodicity: $PERIODICITY"
+        genmprd 0 0 x -readmtbl
+        genmprd 0 0 y -readmprd -readmtbl
+        genmprd 0 0 z -readmprd -readmtbl
+    elif [[ "$PERIODICITY" == "Z" ]]; then
+        echo "Handling MASS periodicity: $PERIODICITY"
+        genmprd 0 0 z -readmtbl
+    fi
+}
+
+function handle_flow_periodicity()
+{
+    ensure_commands genmprd
+    if [[ "$PERIODICITY" == "XY" ]]; then
+        echo "Handling FLOW periodicity: $PERIODICITY"
+        genmprd 0 0 x
+        genmprd 0 0 y -readmprd
+    elif [[ "$PERIODICITY" == "XYZ" ]]; then
+        echo "Handling FLOW periodicity: $PERIODICITY"
+        genmprd 0 0 x
+        genmprd 0 0 y -readmprd
+        genmprd 0 0 z -readmprd
+    elif [[ "$PERIODICITY" == "Z" ]]; then
+        echo "Handling FLOW periodicity: $PERIODICITY"
+        genmprd 0 0 z
+    fi
+}
+
+function prepare_mesh_myself()
+{
+    local MFILES=('mien' 'mxyz' 'mrng' 'minf' 'mtbl' 'mmat' 'mprd' 'mtbl.space' 'mxyz.space' 'mtbl.dual' 'minf.space' 'mprd.space')
+    local FLOW_MESH_DIR="FLOW/mesh"
+    local MASS_MESH_DIR="MASS/mesh"
+    local PARTICLES_SURFACE_GROUP_IDX=4
+    local PARTICLES_VOLUME_GROUP_IDX=2
+
+    [[ -f mesh_column.msh2 ]] || die "No such file: mesh_column.msh2"
+    check_files FLOW/mesh/{mxyz,mien,mrng,minf} MASS/mesh/{mxyz,mien,mrng,minf} && return
+
+    proclaim "Preparing mesh"
+     
+    echo "Cleaning up files"
+    for mfile in "${MFILES[@]}"; do
+        rm -f "$mfile"
+    done
+
+    echo "Setting up directories"
+    setup_dir "$FLOW_MESH_DIR"
+    setup_dir "$MASS_MESH_DIR"
+
+    proclaim "Starting mesh conversion"
+    if [[ "$LEGACY_GMSH2MIXD" == 1 ]]; then
+        ensure_run gmsh2mixd_3D -d "$PARTICLES_SURFACE_GROUP_IDX" -m sd "$MESHFILE"
+    else
+        ensure_run gmsh2mixdv2 -d "$PARTICLES_SURFACE_GROUP_IDX" -o "$MESH_ORDER" "$MESHFILE"
+    fi
+    proclaim "Mesh conversion complete"
+
+    handle_mass_periodicity
+    spacetimeify_mesh
+
+    echo "Moving mesh files"
+    for mfile in "${MFILES[@]}"; do
+        echo "moving $mfile"
+        mv "$mfile" "$MASS_MESH_DIR"
+    done
+
+    echo "Removing packed-bed to create interstitial mesh"
+    cd "$MASS_MESH_DIR"
+    rmmat -"$ETYPE" -st ../../FLOW/mesh "$PARTICLES_VOLUME_GROUP_IDX"
+    gennmat "$NEN" st
+    cd "$BASE"
+
+    cd "$FLOW_MESH_DIR"
+    handle_flow_periodicity
+    cd "$BASE"
+}
+
 function decompose_mesh()
 {
     local SIM_STAGE="$1"
@@ -227,7 +347,8 @@ function decompose_mesh()
     cd "${SIM_STAGE_UPPER}/mesh"
 
     if ! check_files neim ; then
-        ensure_run gendual -e "$ETYPE" && genneim --nen "$NEN" "$SPACETIME_ARG"
+        ensure_run gendual -e "$ETYPE" 
+        ensure_run genneim --nen "$NEN" "$SPACETIME_ARG"
     fi
 
     if ! check_files {mprm,nprm}.${NMP_04} ; then
@@ -245,10 +366,10 @@ function driver()
         generate_mesh
     elif [[ "$MODE" == "PREPARE" ]]; then
         generate_mesh
-        prepare_mesh
+        prepare_mesh_myself
     elif [[ "$MODE" == "RUN" ]]; then
         generate_mesh
-        prepare_mesh
+        prepare_mesh_myself
         local SIM_STAGE="${SIM_STAGES[0]}"
         echo "WARNING: Due to FLOW -> MESH dependency, RUN mode can only dispatch one simulation stage at a time."
         echo "WARNING: Running $SIM_STAGE simulation."
@@ -256,7 +377,7 @@ function driver()
         run_simulation_stage "$SIM_STAGE" "$SIM_NAME"
     elif [[ "$MODE" == "RUNWAIT" ]]; then
         generate_mesh
-        prepare_mesh
+        prepare_mesh_myself
         for SIM_STAGE in ${SIM_STAGES[@]}; do 
             decompose_mesh "$SIM_STAGE"
             run_simulation_stage "$SIM_STAGE" "$SIM_NAME"
@@ -317,10 +438,13 @@ JOB_ID=
 # We currently
 DISPATCH_PREFIX=
 
-## Currently duplicated decomposition from chroma.sh
+## Commands with potential for MPI dispatched runs
 DECOMPOSE_COMMAND="decompose.metis"
 MIXD2PVTU_COMMAND="mixd2pvtu"
+
 ETYPE=tet && NEN=4 && MESH_ORDER=1
+PERIODICITY=
+LEGACY_GMSH2MIXD=0
 
 SOFTWARE_STAGE=2022
 
@@ -380,6 +504,15 @@ do
             DISPATCH_PREFIX="$2"
             shift # past value
             shift # past value
+            ;;
+        -l|--legacy-gmsh2mixd)
+            LEGACY_GMSH2MIXD=1
+            shift
+            ;;
+        --periodicity)
+            PERIODICITY="$2"
+            shift
+            shift
             ;;
         *)    # unknown option
             POSITIONAL+=("$1") # save it in an array for later
