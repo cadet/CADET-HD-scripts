@@ -529,6 +529,10 @@ fi
 
 ensure_match "^(MESH|PREPARE|RUN|WAIT|RUNWAIT|CONVERT)$" "$MODE"
 
+echo "Dispatch mode: $DISPATCH"
+echo "Dispatch prefix: $DISPATCH_PREFIX"
+echo "Remote: $REMOTE"
+
 if [[ "$DISPATCH" == "JURECA" ]]; then
     ensure_match "(jureca|jrc.*)" $(hostname)
 fi
