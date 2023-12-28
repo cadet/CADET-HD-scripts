@@ -289,12 +289,12 @@ function prepare_mesh_myself()
     local MASS_MESH_DIR="MASS/mesh"
     local PARTICLES_SURFACE_GROUP_IDX=4
     local PARTICLES_VOLUME_GROUP_IDX=2
+    local MESHFILE="mesh_column.msh2"
 
-    [[ -f mesh_column.msh2 ]] || die "No such file: mesh_column.msh2"
-    check_files FLOW/mesh/{mxyz,mien,mrng,minf} MASS/mesh/{mxyz,mien,mrng,minf} && return
+    [[ -f "$MESHFILE" ]] || die "No such file: $MESHFILE"
+    check_files FLOW/mesh/{mxyz,mien,mrng,minf} MASS/mesh/{mxyz,mien,mrng,minf} && echo "RETURNING EARLY" && return
 
     proclaim "Preparing mesh"
-     
     echo "Cleaning up files"
     for mfile in "${MFILES[@]}"; do
         rm -f "$mfile"
