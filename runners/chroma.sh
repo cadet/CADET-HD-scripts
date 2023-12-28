@@ -61,6 +61,20 @@ function spacetimeify()
     fi
 }
 
+function spacetimeify_mesh()
+{
+    spacetimeify mxyz
+    spacetimeify mtbl
+    spacetimeify mprd
+
+    # update minf
+    cp minf minf.space
+    NN=$(awk '/^nn/{print $2}' minf)
+    NNST=$(( NN * 2 ))
+    sed -i 's/nn/# nn/' minf
+    echo "nn     $NNST" >> minf
+}
+
 function handle_mass_periodicity()
 {
     ## Some code in XNS: genmesh.F / genmtbl()/genmprd() etc allows us
@@ -199,16 +213,7 @@ fi
 handle_mass_periodicity
 
 proclaim "Creating spacetime meshes"
-spacetimeify mxyz
-spacetimeify mtbl
-spacetimeify mprd
-
-# update minf
-cp minf minf.space
-NN=$(awk '/^nn/{print $2}' minf)
-NNST=$(( NN * 2 ))
-sed -i 's/nn/# nn/' minf
-echo "nn     $NNST" >> minf
+spacetimeify_mesh
 
 proclaim "Moving mesh files"
 
