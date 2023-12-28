@@ -104,7 +104,7 @@ NMESHPARTS=
 ETYPE=tet && NEN=4 && MESH_ORDER=1
 PARTICLES_SURFACE_GROUP_IDX=4
 PARTICLES_VOLUME_GROUP_IDX=2
-DECOMPOSE_DISPATCH_PREFIX=
+DISPATCH_PREFIX=
 ROOT_DIR=$PWD
 MASS_MESH_DIR=MASS/mesh
 FLOW_MESH_DIR=FLOW/mesh
@@ -115,7 +115,7 @@ SOFTWARE_STAGE=2022
 
 ## Alternative options. See below.
 # ETYPE=tetP2 && NEN=10 && MESH_ORDER=2 
-# DECOMPOSE_DISPATCH_PREFIX="srun -N1 -n48 -A jibg12 -p dc-cpu-devel"
+# DISPATCH_PREFIX="srun -N1 -n48 -A jibg12 -p dc-cpu-devel"
 
 ## Commandline args processing
 POSITIONAL=()
@@ -127,14 +127,14 @@ do
             ETYPE=tetP2 && NEN=10 && MESH_ORDER=2
             shift # past value
             ;;
-        -ddd|--decompose-default-dispatch)
-            DECOMPOSE_DISPATCH_PREFIX="srun -N1 -n48 -A jibg12 -p dc-cpu-devel"
-            DECOMPOSE_COMMAND="$DECOMPOSE_DISPATCH_PREFIX $DECOMPOSE_COMMAND"
+        -ddp|--default-dispatch-prefix)
+            DISPATCH_PREFIX="srun -N1 -n48 -A jibg12 -p dc-cpu-devel"
+            DECOMPOSE_COMMAND="$DISPATCH_PREFIX $DECOMPOSE_COMMAND"
             shift # past value
             ;;
-        -ddp|--decompose-dispatch-prefix)
-            DECOMPOSE_DISPATCH_PREFIX="$2"
-            [ -n "$2" ] && DECOMPOSE_COMMAND="$DECOMPOSE_DISPATCH_PREFIX $DECOMPOSE_COMMAND"
+        -dp|--dispatch-prefix)
+            DISPATCH_PREFIX="$2"
+            [ -n "$DISPATCH_PREFIX" ] && DECOMPOSE_COMMAND="$DISPATCH_PREFIX $DECOMPOSE_COMMAND"
             shift # past value
             shift # past value
             ;;

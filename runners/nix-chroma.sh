@@ -193,13 +193,22 @@ function generate_mesh()
 
 }
 
+# TODO: Consider moving chroma.sh code into this function fully. That would
+# reduce the overhead of maintaining 2 scripts and passing arguments and
+# parameters between them. Error code handling also becomes easier In order to
+# just prepare the mesh locally, I could then just run this script with the
+# appropriate flags.
 function prepare_mesh()
 {
     [[ -f mesh_column.msh2 ]] || die "No such file: mesh_column.msh2"
     if ! check_files FLOW/mesh/{mxyz,mien,mrng,minf} MASS/mesh/{mxyz,mien,mrng,minf} ; then
         # TODO: Ensure chroma.sh is error-code compliant. 
         # TODO: Ensure that all component tools are error-code compliant
-        ensure_run chroma.sh mesh_column.msh2 -n $NMESHPARTS -l 
+        if [[ -n "$DISPATCH_PREFIX" ]]; then
+            ensure_run chroma.sh mesh_column.msh2 -n $NMESHPARTS -l --dispatch-prefix "$DISPATCH_PREFIX"
+        else
+            ensure_run chroma.sh mesh_column.msh2 -n $NMESHPARTS -l
+        fi
     fi
 }
 
@@ -295,14 +304,22 @@ SIM_STAGES=(FLOW MASS)
 MODE="RUNWAIT"
 
 # DISPATCH can be one of [ JURECA , REMOTE, LOCAL ]. 
-# LOCAL => Run locally on a machine/node (NOT IMPLEMENTED YET)
-# REMOTE => Run script locally, sync data to/from remote. Use jrun to submit data. Currently tightly coupled with JURECA.
+# LOCAL => Run fully locally on a machine/node (NOT IMPLEMENTED YET)
+# REMOTE => Run script locally, sync data to/from remote. Use jrun to submit data on remote. Currently tightly coupled with JURECA.
 # JURECA => Run script locally on JURECA. Submit job with jrun.
 DISPATCH="JURECA" 
 JOB_ID=
 
+# Sometimes, tasks need to be dispatched in parallel on compute nodes on JURECA.
+# For example, decompose and mixd2pvtu.
+# This prefix can specify dispatch parameters, e.g.,
+# DISPATCH_PREFIX='srun -N1 -n64 -A jibg12 -p dc-cpu-devel --time=02:00:00'
+# We currently
+DISPATCH_PREFIX=
+
 ## Currently duplicated decomposition from chroma.sh
 DECOMPOSE_COMMAND="decompose.metis"
+MIXD2PVTU_COMMAND="mixd2pvtu"
 ETYPE=tet && NEN=4 && MESH_ORDER=1
 
 SOFTWARE_STAGE=2022
@@ -341,7 +358,7 @@ do
             shift
             ;;
         -d|--dispatch)
-            DISPATCH="$2"
+            DISPATCH=$(echo "$2" | tr '[:lower:]' '[:upper:]')
             ensure_match "^(JURECA|REMOTE)$" "$DISPATCH"
             shift
             ;;
@@ -354,6 +371,15 @@ do
             JOB_ID=$(filter_integer "$2")
             [[ -n "$JOB_ID" ]] || die "Bad JOB_ID provided to --wait"
             shift
+            ;;
+        -ddp|--default-dispatch-prefix)
+            DISPATCH_PREFIX="srun -A jibg12 -N1 -n48"
+            shift # past value
+            ;;
+        -dp|--dispatch-prefix)
+            DISPATCH_PREFIX="$2"
+            shift # past value
+            shift # past value
             ;;
         *)    # unknown option
             POSITIONAL+=("$1") # save it in an array for later
@@ -382,6 +408,7 @@ if [[ $(hostname) =~ (jureca|jrc.*) ]]; then
         ## Unfortunately, on JURECA, ParMETIS-double is only available on 2022 stage
         ## So we use this as the default
         module load Stages/2022 GCC/11.2.0 ParaStationMPI/5.5.0-1 ParMETIS/4.0.3-double Boost/1.78.0 VTK/9.1.0 flex/2.6.4  
+
     elif [[ "$SOFTWARE_STAGE" == 2024 ]]; then
         module load Stages/2024 GCC/12.3.0 ParaStationMPI/5.9.2-1 ParMETIS/4.0.3 Boost/1.82.0 VTK/9.3.0 flex/2.6.4
     fi
@@ -389,6 +416,11 @@ if [[ $(hostname) =~ (jureca|jrc.*) ]]; then
     # for pymesh
     module load gmsh/4.11.0-2ac03e-copymesh.lua
     source ~/cjibg12/miniconda3/bin/activate dev 
+fi
+
+if [[ -n "$DISPATCH_PREFIX" ]]; then
+    DECOMPOSE_COMMAND="$DISPATCH_PREFIX $DECOMPOSE_COMMAND"
+    MIXD2PVTU_COMMAND="$DISPATCH_PREFIX $MIXD2PVTU_COMMAND"
 fi
 
 driver
