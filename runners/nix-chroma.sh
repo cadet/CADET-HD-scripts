@@ -107,7 +107,7 @@ function run_simulation_stage()
     [[ "$SIM_STAGE_UPPER" == "MASS" ]] && mapflow_wrapper "$SIM_DIR"
 
     if [[ "$DISPATCH" == "REMOTE" ]] ; then 
-        ensure_run mirror -m -y --delete push $REMOTE -f "$SIM_STAGE_UPPER"
+        ensure_run mirror -m -y push $REMOTE -f "$SIM_STAGE_UPPER"
         echo "Submitting job on $REMOTE"
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         local JRUN_OUT=$(ensure_run mirror cmd 'jrun -x -nt '$NTPN' -np '$NMESHPARTS' -n -ne' --target $REMOTE)
