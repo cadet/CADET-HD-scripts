@@ -162,7 +162,7 @@ function convert_results()
     [ -f "$SIM_STAGE_UPPER/$SIM_DIR/mixd2pvtu.in" ] || die "No mixd2pvtu file found in dir: $SIM_STAGE_UPPER/$SIM_DIR"
 
     cd "$SIM_STAGE_UPPER/$SIM_DIR"
-    ensure_run mixd2pvtu mixd2pvtu.in
+    ensure_run $MIXD2PVTU_COMMAND mixd2pvtu.in
     cd "$BASE"
 }
 
@@ -352,7 +352,7 @@ function decompose_mesh()
     fi
 
     if ! check_files {mprm,nprm}.${NMP_04} ; then
-        ensure_run "$DECOMPOSE_COMMAND" -e "$ETYPE" -p "$NMESHPARTS" -w $SPACETIME_ARG
+        ensure_run $DECOMPOSE_COMMAND -e "$ETYPE" -p "$NMESHPARTS" -w $SPACETIME_ARG
     fi
 
     cd "$BASE"
