@@ -104,15 +104,17 @@ function run_simulation_stage()
 
     if [[ "$DISPATCH" == "REMOTE" ]] ; then 
         ensure_run mirror -m -y --delete push $REMOTE -f "$SIM_STAGE_UPPER"
-        proclaim "Submitting job on $REMOTE"
+        echo "Submitting job on $REMOTE"
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         local JRUN_OUT=$(ensure_run mirror cmd 'jrun -x -nt '$NTPN' -np '$NMESHPARTS' -n -ne' --target $REMOTE)
         JOB_ID=$(echo "$JRUN_OUT" | tail -n 1 | grep Submitted | awk '{print $2}')
+        echo "$SIM_STAGE_UPPER simulation dispatched with JobID: $JOB_ID"
         cd "$BASE"
     elif [[ "$DISPATCH" == "JURECA" ]] ; then
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         local JRUN_OUT=$(jrun -x -nt $NTPN -np $NMESHPARTS -n -ne)
         JOB_ID=$(echo "$JRUN_OUT" | tail -n 1 | grep Submitted | awk '{print $2}')
+        echo "$SIM_STAGE_UPPER simulation dispatched with JobID: $JOB_ID"
         cd "$BASE"
     fi
 }
@@ -292,7 +294,7 @@ function prepare_mesh_myself()
     local MESHFILE="mesh_column.msh2"
 
     [[ -f "$MESHFILE" ]] || die "No such file: $MESHFILE"
-    check_files FLOW/mesh/{mxyz,mien,mrng,minf} MASS/mesh/{mxyz,mien,mrng,minf} && echo "RETURNING EARLY" && return
+    check_files FLOW/mesh/{mxyz,mien,mrng,minf} MASS/mesh/{mxyz,mien,mrng,minf} && echo "Mesh files exist. Skipping preparation." && return
 
     proclaim "Preparing mesh"
     echo "Cleaning up files"
