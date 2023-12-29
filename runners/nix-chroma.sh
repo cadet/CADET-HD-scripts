@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 
 ## Use the following shebang to run the script under a nix develop shell
 #!/usr/bin/env -S nix develop --impure /home/jayghoshter/dev/tools/pymesh/flake.nix --command zsh
@@ -82,6 +82,10 @@ function ensure_dirs()
 
 function run_simulation_stage()
 {
+    if [[ "$DISPATCH" == "JURECA" ]]; then
+        ensure_match "(jureca|jrc.*)" $(hostname)
+    fi
+
     local SIM_STAGE="$1"
     local SIM_DIR="$2"
 
@@ -121,6 +125,10 @@ function run_simulation_stage()
 
 function wait_for_results()
 {
+    if [[ "$DISPATCH" == "JURECA" ]]; then
+        ensure_match "(jureca|jrc.*)" $(hostname)
+    fi
+
     local SIM_STAGE="$1"
     local SIM_DIR="$2"
 
@@ -534,10 +542,6 @@ ensure_match "^(MESH|PREPARE|RUN|WAIT|RUNWAIT|CONVERT)$" "$MODE"
 echo "Dispatch mode: $DISPATCH"
 echo "Dispatch prefix: $DISPATCH_PREFIX"
 echo "Remote: $REMOTE"
-
-if [[ "$DISPATCH" == "JURECA" ]]; then
-    ensure_match "(jureca|jrc.*)" $(hostname)
-fi
 
 if [[ $(hostname) =~ (jureca|jrc.*) ]]; then 
     source /p/software/jurecadc/lmod/8.4.1/init/zsh
