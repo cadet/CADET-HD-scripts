@@ -224,6 +224,7 @@ function prepare_mesh()
 
 function setup_dir()
 {
+    [[ -n "$1" ]] || die "Empty arg: $1"
     [ -d "$1" ] && rm -rf "$1"
     mkdir -p "$1"
 }
