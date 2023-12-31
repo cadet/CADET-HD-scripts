@@ -120,6 +120,10 @@ function run_simulation_stage()
         JOB_ID=$(echo "$JRUN_OUT" | tail -n 1 | grep Submitted | awk '{print $2}')
         echo "$SIM_STAGE_UPPER simulation dispatched with JobID: $JOB_ID"
         cd "$BASE"
+    elif [[ "$DISPATCH" == "LOCAL" ]]; then
+        cd "$SIM_STAGE_UPPER/$SIM_DIR"
+        ensure_run $XNS_LOCAL_COMMAND < xns.in
+        cd "$BASE"
     fi
 }
 
@@ -127,6 +131,8 @@ function wait_for_results()
 {
     if [[ "$DISPATCH" == "JURECA" ]]; then
         ensure_match "(jureca|jrc.*)" $(hostname)
+    elif [[ "$DISPATCH" == "LOCAL" ]]; then
+        return
     fi
 
     local SIM_STAGE="$1"
@@ -452,12 +458,14 @@ DISPATCH_PREFIX=
 ## Commands with potential for MPI dispatched runs
 DECOMPOSE_COMMAND="decompose.metis"
 MIXD2PVTU_COMMAND="mixd2pvtu"
+XNS_LOCAL_COMMAND=/home/jayghoshter/local/simulation/bin/xns-mpi
 
 ETYPE=tet && NEN=4 && MESH_ORDER=1
 PERIODICITY=
 LEGACY_GMSH2MIXD=0
 
 SOFTWARE_STAGE=2022
+
 
 ## Commandline args processing
 POSITIONAL=()
@@ -494,7 +502,7 @@ do
             ;;
         -d|--dispatch)
             DISPATCH=$(echo "$2" | tr '[:lower:]' '[:upper:]')
-            ensure_match "^(JURECA|REMOTE)$" "$DISPATCH"
+            ensure_match "^(JURECA|REMOTE|LOCAL)$" "$DISPATCH"
             shift
             ;;
         -r|--run|--no-wait)
@@ -565,6 +573,7 @@ fi
 if [[ -n "$DISPATCH_PREFIX" ]]; then
     DECOMPOSE_COMMAND="$DISPATCH_PREFIX $DECOMPOSE_COMMAND"
     MIXD2PVTU_COMMAND="$DISPATCH_PREFIX $MIXD2PVTU_COMMAND"
+    XNS_LOCAL_COMMAND="$DISPATCH_PREFIX $XNS_LOCAL_COMMAND"
 fi
 
 driver
