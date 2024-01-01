@@ -95,7 +95,7 @@ do
         -a|--account)
             tmp=$(ls -At .jobs/*.job | fuzscope)
             jobid=$(basename "${tmp%%.job}")
-            sacct -j "$jobid" -o NTasks,AllocCPUS,Elapsed,MaxRSS
+            sacct -j "$jobid" -o NTasks,AllocCPUS,Elapsed,MaxRSS --units=G
             exit
             ;;
         -q|--quota)
