@@ -107,20 +107,23 @@ function run_simulation_stage()
     [[ "$SIM_STAGE_UPPER" == "MASS" ]] && mapflow_wrapper "$SIM_DIR"
 
     if [[ "$DISPATCH" == "REMOTE" ]] ; then 
+        echo "Pushing files to $REMOTE"
         ensure_run mirror -m -y push $REMOTE -f "$SIM_STAGE_UPPER"
-        echo "Submitting job on $REMOTE"
+        echo "Submitting job $SIM_STAGE_UPPER/$SIM_DIR on $REMOTE"
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         local JRUN_OUT=$(ensure_run mirror cmd 'jrun -x -nt '$NTPN' -np '$NMESHPARTS' -n -ne' --target $REMOTE)
         JOB_ID=$(echo "$JRUN_OUT" | tail -n 1 | grep Submitted | awk '{print $2}')
         echo "$SIM_STAGE_UPPER simulation dispatched with JobID: $JOB_ID"
         cd "$BASE"
     elif [[ "$DISPATCH" == "JURECA" ]] ; then
+        echo "Submitting job $SIM_STAGE_UPPER/$SIM_DIR"
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         local JRUN_OUT=$(jrun -x -nt $NTPN -np $NMESHPARTS -n -ne)
         JOB_ID=$(echo "$JRUN_OUT" | tail -n 1 | grep Submitted | awk '{print $2}')
         echo "$SIM_STAGE_UPPER simulation dispatched with JobID: $JOB_ID"
         cd "$BASE"
     elif [[ "$DISPATCH" == "LOCAL" ]]; then
+        echo "Running job $SIM_STAGE_UPPER/$SIM_DIR"
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         ensure_run $XNS_LOCAL_COMMAND < xns.in
         cd "$BASE"
