@@ -95,9 +95,15 @@ function split_data()
     DATA_FILE="$1"
     DATA_DIR="$(dirname $DATA_FILE)"
     cd "$DATA_DIR" || die "Bad cd: $DATA_DIR" 
-    [[ "$SPLIT_BULKC" == 1 ]] && ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bulk" -o interstitial_c.all & 
-    [[ "$SPLIT_BEDQ" == 1 ]] && ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o bed_q.all -i 1 &
-    [[ "$SPLIT_BEDC" == 1 ]] && ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o bed_c.all -i 0 & 
+    if [[ "$SPLIT_BULKC" == 1 ]] && [[ ! -f bulk_c.all ]]; then 
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bulk" -o bulk_c.all & 
+    fi
+    if [[ "$SPLIT_BEDQ" == 1 ]] && [[ ! -f bed_c.all ]]; then
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o bed_c.all -i 0 & 
+    fi
+    if [[ "$SPLIT_BEDC" == 1 ]] && [[ ! -f bed_q.all ]]; then
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o bed_q.all -i 1 &
+    fi
     cd "$ROOT"
 
     wait
