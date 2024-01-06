@@ -122,6 +122,27 @@ function split_data()
     wait
 }
 
+function filename_map()
+{
+    OUTFILES=()
+    for DATA_FILE in "$@"; do 
+        local DATA_FILE="$(realpath "$1")"
+        local DATA_DIR="$(dirname "$DATA_FILE")"
+        local DATA_DIR_NAME="$(basename "$DATA_DIR")"
+        local FILENAME_PREFIX=
+        local OUTPUT_PREFIX=
+
+        if [[ -n "$OUTPUT_DATA_ROOT" ]]; then
+            OUTPUT_PREFIX="$(realpath $OUTPUT_DATA_ROOT)"
+            FILENAME_PREFIX="${DATA_DIR_NAME}_"
+        else
+            OUTPUT_PREFIX="$(realpath $DATA_DIR)"
+        fi
+        OUTFILES+=("${OUTPUT_PREFIX}/${FILENAME_PREFIX}")
+    done
+    echo "${OUTFILES[@]}"
+}
+
 ROOT="$PWD"
 
 MASS_MESH_DIR=
@@ -209,6 +230,8 @@ for DATA_FILE in "${DATA_FILES[@]}"; do
     split_data "$DATA_FILE" &
 done
 
+OUTFILES_BULK_C="$(filename_map "${DATA_FILES[@]}" | sed -E 's|([^ ]+)|\1bulk_c.all|')"
+
 read -r -d '' CONFIG_BULKC << EOFMARKER
 title bulk_c
 outpath bulk_c
@@ -219,7 +242,7 @@ mien ${OUTPUT_MESH_ROOT}/mesh-bulk/mien
 
 elemtype tet
 nrec 99999
-data $(echo ${DATA_FILES[@]} | sed 's|data.all|bulk_c.all|')
+data ${OUTFILES_BULK_C[@]}
 ndf 1
 # dt 50
 # dtFile ..
