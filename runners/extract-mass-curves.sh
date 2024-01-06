@@ -184,4 +184,22 @@ for DATA_FILE in "${DATA_FILES[@]}"; do
     split_data "$DATA_FILE" &
 done
 
+read -r -d '' CONFIG_BULKC << EOFMARKER
+title bulkc
+outpath bulkc
+
+minf ${OUTPUT_MESH_ROOT}/mesh-bulk/minf
+mxyz ${OUTPUT_MESH_ROOT}/mesh-bulk/mxyz
+mien ${OUTPUT_MESH_ROOT}/mesh-bulk/mien
+
+elemtype tet
+nrec 99999
+data $(echo ${DATA_FILES[@]} | sed 's|data.all|bulk_c.all|')
+ndf 1
+# dt 50
+# dtFile ..
+EOFMARKER
+
+echo -e "$CONFIG_BULKC" > mixd2pvtu.sample.in
+
 wait
