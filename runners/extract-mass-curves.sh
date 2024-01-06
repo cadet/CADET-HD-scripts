@@ -92,11 +92,14 @@ function split_mesh()
 
 function split_data()
 {
-    DATA_FILE="$1"
-    DATA_DIR="$(dirname $DATA_FILE)"
+    DATA_FILE="$(realpath "$1")"
+    DATA_DIR="$(dirname "$DATA_FILE")"
+    DATA_DIR_NAME="$(basename "$DATA_DIR")"
+    FILENAME_PREFIX=
 
     if [[ -n "$OUTPUT_DATA_ROOT" ]]; then
         OUTPUT_PREFIX="$(realpath $OUTPUT_DATA_ROOT)"
+        FILENAME_PREFIX="${DATA_DIR_NAME}_"
     else
         OUTPUT_PREFIX="$(realpath $DATA_DIR)"
     fi
@@ -105,14 +108,14 @@ function split_data()
     ensure_dirs "$OUTPUT_PREFIX"
 
     cd "$DATA_DIR" || die "Bad cd: $DATA_DIR" 
-    if [[ "$SPLIT_BULKC" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/bulk_c.all" ]]; then 
-        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bulk" -o "${OUTPUT_PREFIX}"/bulk_c.all & 
+    if [[ "$SPLIT_BULKC" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bulk_c.all" ]]; then 
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bulk" -o "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bulk_c.all" & 
     fi
-    if [[ "$SPLIT_BEDQ" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/bed_c.all" ]]; then
-        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o "${OUTPUT_PREFIX}"/bed_c.all -i 0 & 
+    if [[ "$SPLIT_BEDQ" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bed_c.all" ]]; then
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bed_c.all" -i 0 & 
     fi
-    if [[ "$SPLIT_BEDC" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/bed_q.all" ]]; then
-        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o "${OUTPUT_PREFIX}"/bed_q.all -i 1 &
+    if [[ "$SPLIT_BEDC" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bed_q.all" ]]; then
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bed_q.all" -i 1 &
     fi
     cd "$ROOT"
 
