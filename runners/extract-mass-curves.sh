@@ -113,7 +113,7 @@ ROOT="$PWD"
 
 MASS_MESH_DIR=
 MASS_SIM_DIR=
-OUTPUT_MESH_ROOT="splitmeshes"
+OUTPUT_MESH_ROOT="meshes_split"
 
 DATA_FILES=$(find . -type f -iname data.all | sort)
 
