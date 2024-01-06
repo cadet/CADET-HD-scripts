@@ -121,6 +121,8 @@ SPLIT_BULKC=
 SPLIT_BEDC=
 SPLIT_BEDQ=
 
+SCRIPT_PATH=$(readlink -f -- "$BASH_SOURCE")
+
 POSITIONAL=()
 while [[ $# -gt 0 ]]
 do
@@ -160,6 +162,11 @@ do
         --bedq)
             SPLIT_BEDQ=1
             shift;
+            ;;
+        -h|--help)
+            echo "The following args are processed:" 
+            grep -Po '\s*-\w+\|[^)]*' "$SCRIPT_PATH"
+            exit
             ;;
         *)    # unknown option
             POSITIONAL+=("$1") # save it in an array for later
