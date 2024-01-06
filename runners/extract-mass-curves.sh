@@ -94,15 +94,25 @@ function split_data()
 {
     DATA_FILE="$1"
     DATA_DIR="$(dirname $DATA_FILE)"
+
+    if [[ -n "$OUTPUT_DATA_ROOT" ]]; then
+        OUTPUT_PREFIX="$(realpath $OUTPUT_DATA_ROOT)"
+    else
+        OUTPUT_PREFIX="$(realpath $DATA_DIR)"
+    fi
+
+    mkdir -p "$OUTPUT_PREFIX"
+    ensure_dirs "$OUTPUT_PREFIX"
+
     cd "$DATA_DIR" || die "Bad cd: $DATA_DIR" 
-    if [[ "$SPLIT_BULKC" == 1 ]] && [[ ! -f bulk_c.all ]]; then 
-        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bulk" -o bulk_c.all & 
+    if [[ "$SPLIT_BULKC" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/bulk_c.all" ]]; then 
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bulk" -o "${OUTPUT_PREFIX}"/bulk_c.all & 
     fi
-    if [[ "$SPLIT_BEDQ" == 1 ]] && [[ ! -f bed_c.all ]]; then
-        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o bed_c.all -i 0 & 
+    if [[ "$SPLIT_BEDQ" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/bed_c.all" ]]; then
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o "${OUTPUT_PREFIX}"/bed_c.all -i 0 & 
     fi
-    if [[ "$SPLIT_BEDC" == 1 ]] && [[ ! -f bed_q.all ]]; then
-        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o bed_q.all -i 1 &
+    if [[ "$SPLIT_BEDC" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/bed_q.all" ]]; then
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o "${OUTPUT_PREFIX}"/bed_q.all -i 1 &
     fi
     cd "$ROOT"
 
@@ -114,6 +124,7 @@ ROOT="$PWD"
 MASS_MESH_DIR=
 MASS_SIM_DIR=
 OUTPUT_MESH_ROOT="meshes_split"
+OUTPUT_DATA_ROOT=
 
 DATA_FILES=$(find . -type f -iname data.all | sort)
 
@@ -137,8 +148,12 @@ do
             DATA_FILES=$(find "$MASS_SIM_DIR" -type f -iname data.all | sort)
             shift; shift;
             ;;
-        -o|--output-mesh-dir)
+        -mo|--output-mesh-dir)
             OUTPUT_MESH_ROOT="$2"
+            shift; shift;
+            ;;
+        -do|--output-data-dir)
+            OUTPUT_DATA_ROOT="$2"
             shift; shift;
             ;;
         -d|--data)
