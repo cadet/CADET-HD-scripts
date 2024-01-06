@@ -76,6 +76,20 @@ function ensure_dirs()
     done
 }
 
+function split_mesh()
+{
+    cd "$MASS_MESH_DIR"
+    if ! check_files "${OUTPUT_MESH_ROOT}/mesh-bulk/"{minf,mxyz,mien,mrng}; then
+        ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bulk" 2 # Remove packed bed region
+        ensure_run cp nmap nmap.bulk
+    fi
+    if ! check_files "${OUTPUT_MESH_ROOT}/mesh-bed/"{minf,mxyz,mien,mrng}; then
+        ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bed" 1 # Remove interstitial region
+        ensure_run cp nmap nmap.bed
+    fi
+    cd "$ROOT"
+}
+
 function split_data()
 {
     DATA_FILE="$1"
@@ -157,16 +171,9 @@ ensure_commands rmmat mixdsplit
 mkdir -p "${OUTPUT_MESH_ROOT}/mesh-bulk" "${OUTPUT_MESH_ROOT}/mesh-bed"
 
 proclaim "Splitting mesh"
-
-cd "$MASS_MESH_DIR"
-ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bulk" 2 # Remove packed bed region
-ensure_run cp nmap nmap.bulk
-ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bed" 1 # Remove interstitial region
-ensure_run cp nmap nmap.bed
-cd "$ROOT"
+split_mesh
 
 proclaim "Splitting data"
-
 for DATA_FILE in "${DATA_FILES[@]}"; do 
     split_data "$DATA_FILE" &
 done
