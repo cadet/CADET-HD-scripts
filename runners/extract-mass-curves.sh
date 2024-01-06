@@ -4,6 +4,29 @@
 # Output data can be used with paravision to create mass curves in different domains.
 # Mass curves can be used as reference data in chromoo fits.
 
+function proclaim()
+{
+    echo "################################################################################"
+    center_and_fold "$@"
+    echo "################################################################################"
+}
+
+function center_and_fold() {
+    local string="$1"
+    local length=${#string}
+    local block_size=80
+
+    if (( length >= block_size )); then
+        # Fold the string to fit within 80 characters
+        fold -s -w "$block_size" <<< "$string" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'
+    else
+        # Calculate padding for centering
+        local pad=$(( (block_size - length) / 2 ))
+        printf "%*s%s%*s\n" $pad '' "$string" $pad ''
+    fi
+}
+
+
 function die(){
     echo -e "ERROR: $@" >&2
     exit -1
@@ -130,12 +153,16 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 
 ensure_commands rmmat mixdsplit 
 
+proclaim "Splitting mesh"
+
 cd "$MASS_MESH_DIR"
 rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bulk" 2 # Remove packed bed region
 cp nmap nmap.bulk
 rmmat -tet -st mesh-bed 1 # Remove interstitial region
 cp nmap nmap.bed
 cd "$ROOT"
+
+proclaim "Splitting data"
 
 for DATA_FILE in "${DATA_FILES[@]}"; do 
     split_data "$DATA_FILE" &
