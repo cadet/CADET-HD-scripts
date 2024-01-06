@@ -185,8 +185,8 @@ for DATA_FILE in "${DATA_FILES[@]}"; do
 done
 
 read -r -d '' CONFIG_BULKC << EOFMARKER
-title bulkc
-outpath bulkc
+title bulk_c
+outpath bulk_c
 
 minf ${OUTPUT_MESH_ROOT}/mesh-bulk/minf
 mxyz ${OUTPUT_MESH_ROOT}/mesh-bulk/mxyz
@@ -200,6 +200,8 @@ ndf 1
 # dtFile ..
 EOFMARKER
 
-echo -e "$CONFIG_BULKC" > mixd2pvtu.sample.in
+echo -e "$CONFIG_BULKC" > mixd2pvtu.bulk_c.in
+echo -e "$CONFIG_BULKC" | sed 's|bulk|bed|' > mixd2pvtu.bed_c.in
+echo -e "$CONFIG_BULKC" | sed 's|_c|_q|;s|bulk|bed|' > mixd2pvtu.bed_q.in
 
 wait
