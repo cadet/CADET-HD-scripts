@@ -79,10 +79,11 @@ function ensure_dirs()
 function split_data()
 {
     DATA_FILE="$1"
-    cd "$(dirname $DATA_FILE)"
-    [[ "$SPLIT_BULKC" == 1 ]] && mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bulk" -o interstitial_c.all & 
-    [[ "$SPLIT_BEDQ" == 1 ]] && mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o bed_q.all -i 1 &
-    [[ "$SPLIT_BEDC" == 1 ]] && mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o bed_c.all -i 0 & 
+    DATA_DIR="$(dirname $DATA_FILE)"
+    cd "$DATA_DIR" || die "Bad cd: $DATA_DIR" 
+    [[ "$SPLIT_BULKC" == 1 ]] && ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bulk" -o interstitial_c.all & 
+    [[ "$SPLIT_BEDQ" == 1 ]] && ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o bed_q.all -i 1 &
+    [[ "$SPLIT_BEDC" == 1 ]] && ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o bed_c.all -i 0 & 
     cd "$ROOT"
 
     wait
@@ -153,13 +154,15 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 
 ensure_commands rmmat mixdsplit 
 
+mkdir -p "${OUTPUT_MESH_ROOT}/mesh-bulk" "${OUTPUT_MESH_ROOT}/mesh-bed"
+
 proclaim "Splitting mesh"
 
 cd "$MASS_MESH_DIR"
-rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bulk" 2 # Remove packed bed region
-cp nmap nmap.bulk
-rmmat -tet -st mesh-bed 1 # Remove interstitial region
-cp nmap nmap.bed
+ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bulk" 2 # Remove packed bed region
+ensure_run cp nmap nmap.bulk
+ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bed" 1 # Remove interstitial region
+ensure_run cp nmap nmap.bed
 cd "$ROOT"
 
 proclaim "Splitting data"
