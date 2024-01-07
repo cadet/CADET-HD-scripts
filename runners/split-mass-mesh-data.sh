@@ -253,7 +253,7 @@ ndf 1
 EOFMARKER
 
 echo -e "$CONFIG_BULKC" > mixd2pvtu.bulk_c.in
-echo -e "$CONFIG_BULKC" | sed 's|bulk|bed|g' > mixd2pvtu.bed_c.in
-echo -e "$CONFIG_BULKC" | sed 's|_c|_q|;s|bulk|bed|g' > mixd2pvtu.bed_q.in
+echo -e "$CONFIG_BULKC" | sed 's|bulk_c|bed_c|g' > mixd2pvtu.bed_c.in
+echo -e "$CONFIG_BULKC" | sed 's|bulk_c|bed_q|g;s|bulk|bed|g' > mixd2pvtu.bed_q.in
 
 wait
