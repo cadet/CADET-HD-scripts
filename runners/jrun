@@ -15,6 +15,9 @@
 ## USAGE: jrun -c 'srun -n 48 commandname'
 ## USAGE: jrun -c 'pvrun -np 48 volume_integral -o output_prefix ...'
 
+# Examples:
+# jrun -c 'srun -n12 mixd2pvtu mixd2pvtu.bed_c.in; cd bed_c; pvrun -np 12 radial_shell_integrate --nrad 5 --shelltype EQUIDISTANT -o GRM2D_FULL_U.DV' -n -ne 
+
 # set -euo pipefail
 
 mkdir -p .jobs
