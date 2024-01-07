@@ -78,16 +78,18 @@ function ensure_dirs()
 
 function split_mesh()
 {
-    cd "$MASS_MESH_DIR"
-    if ! check_files "${OUTPUT_MESH_ROOT}/mesh-bulk/"{minf,mxyz,mien,mrng}; then
+    if ! check_files "${OUTPUT_MESH_ROOT}/mesh-bulk/"{minf,mxyz,mien,mrng} ; then
+        cd "$MASS_MESH_DIR"
         ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bulk" 2 # Remove packed bed region
         ensure_run cp nmap nmap.bulk
+        cd "$ROOT"
     fi
-    if ! check_files "${OUTPUT_MESH_ROOT}/mesh-bed/"{minf,mxyz,mien,mrng}; then
+    if ! check_files "${OUTPUT_MESH_ROOT}/mesh-bed/"{minf,mxyz,mien,mrng} ; then
+        cd "$MASS_MESH_DIR"
         ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bed" 1 # Remove interstitial region
         ensure_run cp nmap nmap.bed
+        cd "$ROOT"
     fi
-    cd "$ROOT"
 }
 
 function split_data()
@@ -216,8 +218,9 @@ do
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-[[ -d "$MASS_MESH_DIR" ]] || die "MASS_MESH_DIR either not set, or doesn't exist."
-
+MASS_MESH_DIR="$(realpath "${MASS_MESH_DIR}")"
+OUTPUT_MESH_ROOT="$(realpath "${OUTPUT_MESH_ROOT}")"
+ensure_dirs "${MASS_MESH_DIR}"
 ensure_commands rmmat mixdsplit 
 
 mkdir -p "${OUTPUT_MESH_ROOT}/mesh-bulk" "${OUTPUT_MESH_ROOT}/mesh-bed"
@@ -226,6 +229,7 @@ proclaim "Splitting mesh"
 split_mesh
 
 proclaim "Splitting data"
+echo "DATA_FILES: ${DATA_FILES[@]}"
 for DATA_FILE in "${DATA_FILES[@]}"; do 
     split_data "$DATA_FILE" &
 done
