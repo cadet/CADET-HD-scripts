@@ -217,7 +217,6 @@ done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
 [[ -d "$MASS_MESH_DIR" ]] || die "MASS_MESH_DIR either not set, or doesn't exist."
-[[ "${#DATA_FILES[@]}" != 0 ]] || die "No data files found. Use -s or -d args."
 
 ensure_commands rmmat mixdsplit 
 
