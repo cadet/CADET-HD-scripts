@@ -234,7 +234,7 @@ for DATA_FILE in "${DATA_FILES[@]}"; do
     split_data "$DATA_FILE" &
 done
 
-OUTFILES_BULK_C="$(filename_map "${DATA_FILES[@]}" | sed -E 's|([^ ]+)|\1bulk_c.all|')"
+OUTFILES_BULK_C="$(filename_map "${DATA_FILES[@]}" | sed -E 's|([^ ]+)|\1bulk_c.all|g')"
 
 read -r -d '' CONFIG_BULKC << EOFMARKER
 title bulk_c
@@ -253,7 +253,7 @@ ndf 1
 EOFMARKER
 
 echo -e "$CONFIG_BULKC" > mixd2pvtu.bulk_c.in
-echo -e "$CONFIG_BULKC" | sed 's|bulk|bed|' > mixd2pvtu.bed_c.in
-echo -e "$CONFIG_BULKC" | sed 's|_c|_q|;s|bulk|bed|' > mixd2pvtu.bed_q.in
+echo -e "$CONFIG_BULKC" | sed 's|bulk|bed|g' > mixd2pvtu.bed_c.in
+echo -e "$CONFIG_BULKC" | sed 's|_c|_q|;s|bulk|bed|g' > mixd2pvtu.bed_q.in
 
 wait
