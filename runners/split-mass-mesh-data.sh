@@ -150,7 +150,8 @@ MASS_SIM_DIR=
 OUTPUT_MESH_ROOT="meshes_split"
 OUTPUT_DATA_ROOT=
 
-DATA_FILES=$(find . -type f -iname data.all | sort)
+# DATA_FILES=$(find . -type f -iname data.all | sort)
+DATA_FILES=()
 
 SPLIT_BULKC=
 SPLIT_BEDC=
@@ -169,7 +170,7 @@ do
             ;;
         -s|--sim-dir)
             MASS_SIM_DIR="$2"
-            DATA_FILES=$(find "$MASS_SIM_DIR" -type f -iname data.all | sort)
+            DATA_FILES=($(find "$MASS_SIM_DIR" -type f -iname data.all | sort))
             shift; shift;
             ;;
         -mo|--output-mesh-dir)
