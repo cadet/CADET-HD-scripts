@@ -126,13 +126,19 @@ function split_data()
 
 function filename_map()
 {
+    local DATA_FILE
+    local DATA_DIR
+    local DATA_DIR_NAME
+    local OUTPUT_PREFIX
+    local FILENAME_PREFIX
+
     OUTFILES=()
     for DATA_FILE in "$@"; do 
-        local DATA_FILE="$(realpath "$1")"
-        local DATA_DIR="$(dirname "$DATA_FILE")"
-        local DATA_DIR_NAME="$(basename "$DATA_DIR")"
-        local FILENAME_PREFIX=
-        local OUTPUT_PREFIX=
+        DATA_FILE="$(realpath "$DATA_FILE")"
+        DATA_DIR="$(dirname "$DATA_FILE")"
+        DATA_DIR_NAME="$(basename "$DATA_DIR")"
+        FILENAME_PREFIX=
+        OUTPUT_PREFIX=
 
         if [[ -n "$OUTPUT_DATA_ROOT" ]]; then
             OUTPUT_PREFIX="$(realpath $OUTPUT_DATA_ROOT)"
