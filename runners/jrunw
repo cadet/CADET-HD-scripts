@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+# Wrapper for jrun
+# write commands into a file, feed it into this program to run individual commands each through a separate jrun call.
+# example: jrunw commands.jrun -v --no-edit -T 5:00:00
+
+set -euo pipefail
+
+cmdfile="$1"
+shift
+
+if [ -n "$cmdfile" ]; then
+    input_cmds=$(cat "$cmdfile" | grep -v '^\s*#\|^\s*$')
+else
+    input_cmds=$(echo "" | vipe )
+fi
+
+[ -z "$input_cmds" ] && exit
+
+while IFS= read -r cmd ; do 
+    jrun -n $@ -c "$cmd"
+done <<< "$input_cmds"
