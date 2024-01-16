@@ -391,6 +391,12 @@ function driver()
     elif [[ "$MODE" == "PREPARE" ]]; then
         generate_mesh
         prepare_mesh_myself
+    elif [[ "$MODE" == "DECOMPOSE" ]]; then
+        generate_mesh
+        prepare_mesh_myself
+        for SIM_STAGE in ${SIM_STAGES[@]}; do 
+            decompose_mesh "$SIM_STAGE"
+        done
     elif [[ "$MODE" == "RUN" ]]; then
         generate_mesh
         prepare_mesh_myself
@@ -504,6 +510,10 @@ do
             ;;
         -p|--prepare)
             MODE="PREPARE"
+            shift
+            ;;
+        -dec|--decompose)
+            MODE="DECOMPOSE"
             shift
             ;;
         -c|--convert)
