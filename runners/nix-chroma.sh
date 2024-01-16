@@ -511,6 +511,7 @@ do
             DISPATCH=$(echo "$2" | tr '[:lower:]' '[:upper:]')
             ensure_match "^(JURECA|REMOTE|LOCAL)$" "$DISPATCH"
             shift
+            shift
             ;;
         -r|--run|--no-wait)
             MODE="RUN"
@@ -520,6 +521,7 @@ do
             MODE="WAIT"
             JOB_ID=$(filter_integer "$2")
             [[ -n "$JOB_ID" ]] || die "Bad JOB_ID provided to --wait"
+            shift
             shift
             ;;
         -ddp|--default-dispatch-prefix)
