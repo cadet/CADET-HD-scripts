@@ -31,7 +31,7 @@ EDIT=true
 INJOBFILE=""
 NPROC=48
 NTPN=48         # Num Tasks Per Node
-MODE="VIS"
+MODE=""
 TIME=24:00:00
 DEP_JOB=""
 
