@@ -100,9 +100,13 @@ function run_simulation_stage()
     ensure_files "xns.${SIM_STAGE_LOWER}.in"
     ensure_dirs "$SIM_STAGE_UPPER"/{,mesh}
 
-    mkdir "$SIM_STAGE_UPPER/$SIM_DIR"
-    [ -f "xns.${SIM_STAGE_LOWER}.in" ] && cp "xns.${SIM_STAGE_LOWER}.in" $SIM_STAGE_UPPER/$SIM_DIR/xns.in
-    [ -f "mixd2pvtu.${SIM_STAGE_LOWER}.in" ] && cp mixd2pvtu.${SIM_STAGE_LOWER}.in $SIM_STAGE_UPPER/$SIM_DIR/mixd2pvtu.in
+    mkdir -p "$SIM_STAGE_UPPER/$SIM_DIR"
+    if ! check_files "$SIM_STAGE_UPPER/$SIM_DIR/xns.in"; then
+        check_files "xns.${SIM_STAGE_LOWER}.in" && cp "xns.${SIM_STAGE_LOWER}.in" "$SIM_STAGE_UPPER/$SIM_DIR/xns.in"
+    fi
+
+    ensure_files "$SIM_STAGE_UPPER/$SIM_DIR/xns.in"
+    [ -f "mixd2pvtu.${SIM_STAGE_LOWER}.in" ] && cp "mixd2pvtu.${SIM_STAGE_LOWER}.in" "$SIM_STAGE_UPPER/$SIM_DIR/mixd2pvtu.in"
 
     [[ "$SIM_STAGE_UPPER" == "MASS" ]] && mapflow_wrapper "$SIM_DIR"
 
