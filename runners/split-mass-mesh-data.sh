@@ -262,4 +262,9 @@ echo -e "$CONFIG_BULKC" > mixd2pvtu.bulk_c.in
 echo -e "$CONFIG_BULKC" | sed 's|bulk_c|bed_c|g' > mixd2pvtu.bed_c.in
 echo -e "$CONFIG_BULKC" | sed 's|bulk_c|bed_q|g;s|bulk|bed|g' > mixd2pvtu.bed_q.in
 
+echo "Fix the timestep in the relevant mixd2pvtu file and run the following command to calculate total mass in each domain:" | fold -w 50 -s
+echo "jrun -c 'srun -n48 mixd2pvtu mixd2pvtu.bulk_c.in; cd bulk_c; pvrun -np 48 radial_shell_integrate --nrad 5 --shelltype EQUIDISTANT -o GRM2D_FULL_U.DV' -n -ne"
+echo "jrun -c 'srun -n48 mixd2pvtu mixd2pvtu.bed_c.in; cd bed_c; pvrun -np 48 radial_shell_integrate --nrad 5 --shelltype EQUIDISTANT -o GRM2D_FULL_U.DV' -n -ne"
+echo "jrun -c 'srun -n48 mixd2pvtu mixd2pvtu.bed_q.in; cd bed_q; pvrun -np 48 radial_shell_integrate --nrad 5 --shelltype EQUIDISTANT -o GRM2D_FULL_U.DV' -n -ne"
+
 wait
