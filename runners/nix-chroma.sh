@@ -462,6 +462,9 @@ JOB_ID=
 # We currently
 DISPATCH_PREFIX=
 
+DEFAULT_DISPATCH_PREFIX="srun -A jibg12 -N1 -n48"
+# LOCAL_DISPATCH_PREFIX="mpiexec -np $NMESHPARTS"
+
 ## Commands with potential for MPI dispatched runs
 DECOMPOSE_COMMAND="decompose.metis"
 MIXD2PVTU_COMMAND="mixd2pvtu"
@@ -525,7 +528,7 @@ do
             shift
             ;;
         -ddp|--default-dispatch-prefix)
-            DISPATCH_PREFIX="srun -A jibg12 -N1 -n48"
+            DISPATCH_PREFIX="$DEFAULT_DISPATCH_PREFIX"
             shift # past value
             ;;
         -dp|--dispatch-prefix)
