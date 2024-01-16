@@ -445,7 +445,7 @@ SIM_STAGES=(FLOW MASS)
 MODE="RUNWAIT"
 
 # DISPATCH can be one of [ JURECA , REMOTE, LOCAL ]. 
-# LOCAL => Run fully locally on a machine/node (NOT IMPLEMENTED YET)
+# LOCAL => Run fully locally on a machine/node 
 # REMOTE => Run script locally, sync data to/from remote. Use jrun to submit data on remote. Currently tightly coupled with JURECA.
 # JURECA => Run script locally on JURECA. Submit job with jrun.
 DISPATCH="JURECA" 
