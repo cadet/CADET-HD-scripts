@@ -108,7 +108,7 @@ function run_simulation_stage()
 
     if [[ "$DISPATCH" == "REMOTE" ]] ; then 
         echo "Pushing files to $REMOTE"
-        ensure_run mirror -m -y push $REMOTE -f "$SIM_STAGE_UPPER"
+        ensure_run mirror -m -y push $REMOTE -f "$SIM_STAGE_UPPER/mesh" "$SIM_STAGE_UPPER/$SIM_DIR"
         echo "Submitting job $SIM_STAGE_UPPER/$SIM_DIR on $REMOTE"
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         local JRUN_OUT=$(ensure_run mirror cmd 'jrun -x -nt '$NTPN' -np '$NMESHPARTS' -n -ne' --target $REMOTE)
