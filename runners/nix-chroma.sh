@@ -202,7 +202,6 @@ function mapflow_wrapper()
 
     cd "MASS/mesh"
     mapflow -tet ../../FLOW/mesh ../../FLOW/$SIM_DIR ../$SIM_DIR
-    cp flowfield "../$SIM_DIR"
     cd "$BASE"
 }
 
