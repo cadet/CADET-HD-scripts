@@ -201,7 +201,7 @@ function mapflow_wrapper()
     ensure_dirs "MASS/mesh" "MASS/$SIM_DIR"
 
     cd "MASS/mesh"
-    mapflow -tet ../../FLOW/mesh ../../FLOW/$SIM_DIR
+    mapflow -tet ../../FLOW/mesh ../../FLOW/$SIM_DIR ../$SIM_DIR
     cp flowfield "../$SIM_DIR"
     cd "$BASE"
 }
