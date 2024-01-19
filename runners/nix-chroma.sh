@@ -568,7 +568,7 @@ if [[ -n "$1" ]]; then
     SIM_STAGES=("$1")
 fi 
 
-ensure_match "^(MESH|PREPARE|RUN|WAIT|RUNWAIT|CONVERT)$" "$MODE"
+ensure_match "^(MESH|PREPARE|RUN|WAIT|RUNWAIT|CONVERT|DECOMPOSE)$" "$MODE"
 
 echo "Dispatch mode: $DISPATCH"
 echo "Dispatch prefix: $DISPATCH_PREFIX"
