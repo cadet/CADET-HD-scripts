@@ -241,11 +241,21 @@ for DATA_FILE in "${DATA_FILES[@]}"; do
     split_data "$DATA_FILE" &
 done
 
+echo "-------------"
+XNS_CONFS=$(echo "${DATA_FILES[@]}" | sed 's|data.all|xns.in|g')
+echo "Grepping xns.in for timesteps"
+GREPOUT=$(grep -hE '^dt |^dtexp ' $XNS_CONFS)
+echo "$GREPOUT"
+GREPFIRST=$(echo -e "$GREPOUT" | head -n 1 | sed 's|dt ||')
+GREPJOINED=$(echo -e "$GREPOUT" | sed 's|dt ||' | tr '\n' ' ')
+echo ""
+echo "-------------"
+
 OUTFILES_BULK_C="$(filename_map "${DATA_FILES[@]}" | sed -E 's|([^ ]+)|\1bulk_c.all|g')"
 
 read -r -d '' CONFIG_BULKC << EOFMARKER
 title bulk_c
-outpath bulk_c
+outpath output_bulk_c
 
 minf ${OUTPUT_MESH_ROOT}/mesh-bulk/minf
 mxyz ${OUTPUT_MESH_ROOT}/mesh-bulk/mxyz
@@ -255,17 +265,21 @@ elemtype tet
 nrec 99999
 data ${OUTFILES_BULK_C[@]}
 ndf 1
-# dt 50
+dt ${GREPFIRST} # xns.in timesteps: ${GREPJOINED}
 # dtFile ..
 EOFMARKER
 
 echo -e "$CONFIG_BULKC" > mixd2pvtu.bulk_c.in
-echo -e "$CONFIG_BULKC" | sed 's|bulk_c|bed_c|g' > mixd2pvtu.bed_c.in
+echo -e "$CONFIG_BULKC" | sed 's|bulk_c|bed_c|g;s|bulk|bed|g' > mixd2pvtu.bed_c.in
 echo -e "$CONFIG_BULKC" | sed 's|bulk_c|bed_q|g;s|bulk|bed|g' > mixd2pvtu.bed_q.in
 
+echo "-------------"
 echo "Fix the timestep in the relevant mixd2pvtu file and run the following command to calculate total mass in each domain:" | fold -w 50 -s
 echo "jrun -c 'srun -n48 mixd2pvtu mixd2pvtu.bulk_c.in; cd bulk_c; pvrun -np 48 radial_shell_integrate --nrad 5 --shelltype EQUIDISTANT -o GRM2D_FULL_U.DV' -n -ne"
 echo "jrun -c 'srun -n48 mixd2pvtu mixd2pvtu.bed_c.in; cd bed_c; pvrun -np 48 radial_shell_integrate --nrad 5 --shelltype EQUIDISTANT -o GRM2D_FULL_U.DV' -n -ne"
 echo "jrun -c 'srun -n48 mixd2pvtu mixd2pvtu.bed_q.in; cd bed_q; pvrun -np 48 radial_shell_integrate --nrad 5 --shelltype EQUIDISTANT -o GRM2D_FULL_U.DV' -n -ne"
+echo "-------------"
 
 wait
+
+echo "DONE"
