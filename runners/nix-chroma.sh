@@ -201,7 +201,7 @@ function mapflow_wrapper()
     ensure_dirs "MASS/mesh" "MASS/$SIM_DIR"
 
     cd "MASS/mesh"
-    mapflow -tet ../../FLOW/mesh ../../FLOW/$SIM_DIR ../$SIM_DIR
+    mapflow -tet ../../FLOW/mesh ../../FLOW/$SIM_DIR nmap.bulk ../$SIM_DIR
     cd "$BASE"
 }
 
@@ -215,7 +215,7 @@ function generate_mesh()
 
 }
 
-# TODO: Consider moving chroma.sh code into this function fully. That would
+# DONE: Consider moving chroma.sh code into this function fully. That would
 # reduce the overhead of maintaining 2 scripts and passing arguments and
 # parameters between them. Error code handling also becomes easier In order to
 # just prepare the mesh locally, I could then just run this script with the
@@ -346,7 +346,7 @@ function prepare_mesh_myself()
 
     echo "Removing packed-bed to create interstitial mesh"
     cd "$MASS_MESH_DIR"
-    rmmat -"$ETYPE" -st ../../FLOW/mesh "$PARTICLES_VOLUME_GROUP_IDX"
+    rmmat -"$ETYPE" -st ../../FLOW/mesh "$PARTICLES_VOLUME_GROUP_IDX" "nmap.bulk"
     gennmat "$NEN" st
     cd "$BASE"
 

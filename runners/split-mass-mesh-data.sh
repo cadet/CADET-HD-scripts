@@ -80,14 +80,12 @@ function split_mesh()
 {
     if ! check_files "${OUTPUT_MESH_ROOT}/mesh-bulk/"{minf,mxyz,mien,mrng} ; then
         cd "$MASS_MESH_DIR"
-        ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bulk" 2 # Remove packed bed region
-        ensure_run cp nmap nmap.bulk
+        ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bulk" 2 nmap.bulk # Remove packed bed region
         cd "$ROOT"
     fi
     if ! check_files "${OUTPUT_MESH_ROOT}/mesh-bed/"{minf,mxyz,mien,mrng} ; then
         cd "$MASS_MESH_DIR"
-        ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bed" 1 # Remove interstitial region
-        ensure_run cp nmap nmap.bed
+        ensure_run rmmat -tet -st "${OUTPUT_MESH_ROOT}/mesh-bed" 1 nmap.bed # Remove interstitial region
         cd "$ROOT"
     fi
 }
