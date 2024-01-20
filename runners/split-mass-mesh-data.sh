@@ -94,30 +94,26 @@ function split_mesh()
 
 function split_data()
 {
+    ## Assumes we get out full path
     DATA_FILE="$(realpath "$1")"
-    DATA_DIR="$(dirname "$DATA_FILE")"
-    DATA_DIR_NAME="$(basename "$DATA_DIR")"
-    FILENAME_PREFIX=
+    OUTPUT_FILE_PREFIX=$(filename_map "${DATA_FILE}")
+    DATA_DIR="$(dirname "${DATA_FILE}")"
 
-    if [[ -n "$OUTPUT_DATA_ROOT" ]]; then
-        OUTPUT_PREFIX="$(realpath $OUTPUT_DATA_ROOT)"
-        FILENAME_PREFIX="${DATA_DIR_NAME}_"
+    if [ "${OUTPUT_FILE_PREFIX: -1}" == "/" ]; then
+        mkdir -p "${OUTPUT_FILE_PREFIX}"
     else
-        OUTPUT_PREFIX="$(realpath $DATA_DIR)"
+        mkdir -p $(dirname "${OUTPUT_FILE_PREFIX}")
     fi
-
-    mkdir -p "$OUTPUT_PREFIX"
-    ensure_dirs "$OUTPUT_PREFIX"
 
     cd "$DATA_DIR" || die "Bad cd: $DATA_DIR" 
-    if [[ "$SPLIT_BULKC" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bulk_c.all" ]]; then 
-        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bulk" -o "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bulk_c.all" & 
+    if [[ "$SPLIT_BULKC" == 1 ]] && [[ ! -f "${OUTPUT_FILE_PREFIX}bulk_c.all" ]]; then 
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bulk" -o "${OUTPUT_FILE_PREFIX}bulk_c.all" & 
     fi
-    if [[ "$SPLIT_BEDQ" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bed_c.all" ]]; then
-        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bed_c.all" -i 0 & 
+    if [[ "$SPLIT_BEDQ" == 1 ]] && [[ ! -f "${OUTPUT_FILE_PREFIX}bed_c.all" ]]; then
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o "${OUTPUT_FILE_PREFIX}bed_c.all" -i 0 & 
     fi
-    if [[ "$SPLIT_BEDC" == 1 ]] && [[ ! -f "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bed_q.all" ]]; then
-        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o "${OUTPUT_PREFIX}/${FILENAME_PREFIX}bed_q.all" -i 1 &
+    if [[ "$SPLIT_BEDC" == 1 ]] && [[ ! -f "${OUTPUT_FILE_PREFIX}bed_q.all" ]]; then
+        ensure_run mixdsplit -m "${MASS_MESH_DIR}/minf" -N "$MASS_MESH_DIR/nmap.bed" -o "${OUTPUT_FILE_PREFIX}bed_q.all" -i 1 &
     fi
     cd "$ROOT"
 
@@ -130,23 +126,23 @@ function filename_map()
     local DATA_DIR
     local DATA_DIR_NAME
     local OUTPUT_PREFIX
-    local FILENAME_PREFIX
+    local LOCAL_FILENAME_PREFIX
 
     OUTFILES=()
     for DATA_FILE in "$@"; do 
         DATA_FILE="$(realpath "$DATA_FILE")"
         DATA_DIR="$(dirname "$DATA_FILE")"
         DATA_DIR_NAME="$(basename "$DATA_DIR")"
-        FILENAME_PREFIX=
+        LOCAL_FILENAME_PREFIX="${FILENAME_PREFIX}"
         OUTPUT_PREFIX=
 
         if [[ -n "$OUTPUT_DATA_ROOT" ]]; then
             OUTPUT_PREFIX="$(realpath $OUTPUT_DATA_ROOT)"
-            FILENAME_PREFIX="${DATA_DIR_NAME}_"
+            LOCAL_FILENAME_PREFIX="${LOCAL_FILENAME_PREFIX}${DATA_DIR_NAME}_"
         else
             OUTPUT_PREFIX="$(realpath $DATA_DIR)"
         fi
-        OUTFILES+=("${OUTPUT_PREFIX}/${FILENAME_PREFIX}")
+        OUTFILES+=("${OUTPUT_PREFIX}/${LOCAL_FILENAME_PREFIX}")
     done
     echo "${OUTFILES[@]}"
 }
@@ -157,6 +153,7 @@ MASS_MESH_DIR=
 MASS_SIM_DIR=
 OUTPUT_MESH_ROOT="meshes_split"
 OUTPUT_DATA_ROOT=
+FILENAME_PREFIX=
 
 # DATA_FILES=$(find . -type f -iname data.all | sort)
 DATA_FILES=()
@@ -198,6 +195,10 @@ do
                 DATA_FILES+=("$1")
                 shift;
             done
+            ;;
+        -fp|--filename-prefix)
+            FILENAME_PREFIX="$2"
+            shift; shift;
             ;;
         --bulkc)
             SPLIT_BULKC=1
