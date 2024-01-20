@@ -34,6 +34,7 @@ NTPN=48         # Num Tasks Per Node
 MODE=""
 TIME=24:00:00
 DEP_JOB=""
+TITLE="HDChroma"
 
 # XNS_BIN="~/bin/xns-mpi-GCC12.3-PSMPI5.9.2-2023-12-26"
 XNS_BIN="~/bin/xns-mpi-2022-06-25"
@@ -202,6 +203,11 @@ do
             MODE="VIS"
             shift
             ;;
+        --title)
+            TITLE="$2"
+            shift
+            shift
+            ;;
         -h|--help)
             echo "jrun: runscript for JURECA-DC"
             echo "The following args are processed:" 
@@ -220,7 +226,7 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 read -r -d '' HEADER << EOFMARKER
 #!/usr/bin/env bash
 
-#SBATCH -J HDChroma
+#SBATCH -J $TITLE
 #SBATCH -n $NPROC
 #SBATCH --ntasks-per-node=$NTPN
 #SBATCH --time=$TIME
