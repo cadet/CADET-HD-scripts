@@ -111,6 +111,7 @@ function run_simulation_stage()
     [[ "$SIM_STAGE_UPPER" == "MASS" ]] && mapflow_wrapper "$SIM_DIR"
 
     if [[ "$DISPATCH" == "REMOTE" ]] ; then 
+        ensure_commands jrun mirror
         echo "Pushing files to $REMOTE"
         ensure_run mirror -m -y push $REMOTE -f "$SIM_STAGE_UPPER/mesh" "$SIM_STAGE_UPPER/$SIM_DIR"
         echo "Submitting job $SIM_STAGE_UPPER/$SIM_DIR on $REMOTE"
@@ -120,6 +121,7 @@ function run_simulation_stage()
         echo "$SIM_STAGE_UPPER simulation dispatched with JobID: $JOB_ID"
         cd "$BASE"
     elif [[ "$DISPATCH" == "JURECA" ]] ; then
+        ensure_commands jrun
         echo "Submitting job $SIM_STAGE_UPPER/$SIM_DIR"
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         local JRUN_OUT=$(jrun -x -nt $NTPN -np $NMESHPARTS -n -ne)
