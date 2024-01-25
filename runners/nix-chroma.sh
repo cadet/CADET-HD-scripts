@@ -118,7 +118,7 @@ function run_simulation_stage()
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         local JRUN_OUT=$(ensure_run mirror cmd 'jrun -x -nt '$NTPN' -np '$NMESHPARTS' -n -ne' --target $REMOTE)
         JOB_ID=$(echo "$JRUN_OUT" | tail -n 1 | grep Submitted | awk '{print $2}')
-        echo "$SIM_STAGE_UPPER simulation dispatched with JobID: $JOB_ID"
+        echo "$SIM_STAGE_UPPER/$SIM_DIR simulation dispatched with JobID: $JOB_ID"
         cd "$BASE"
     elif [[ "$DISPATCH" == "JURECA" ]] ; then
         ensure_commands jrun
@@ -126,7 +126,7 @@ function run_simulation_stage()
         cd "$SIM_STAGE_UPPER/$SIM_DIR"
         local JRUN_OUT=$(jrun -x -nt $NTPN -np $NMESHPARTS -n -ne)
         JOB_ID=$(echo "$JRUN_OUT" | tail -n 1 | grep Submitted | awk '{print $2}')
-        echo "$SIM_STAGE_UPPER simulation dispatched with JobID: $JOB_ID"
+        echo "$SIM_STAGE_UPPER/$SIM_DIR simulation dispatched with JobID: $JOB_ID"
         cd "$BASE"
     elif [[ "$DISPATCH" == "LOCAL" ]]; then
         echo "Running job $SIM_STAGE_UPPER/$SIM_DIR"
