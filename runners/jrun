@@ -51,6 +51,10 @@ do
             shift # past value
             shift # past value
             ;;
+        -C|--command-all)
+            COMMAND="${@:2}"
+            shift $#
+            ;;
         -n|--no-prompt)
             PROMPT=false
             shift # past value
