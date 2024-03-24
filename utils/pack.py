@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
 """
+### POTENTIALLY DEPRECATED: SEE pymesh/pack-info.py for meshes generated with pymesh instead!
+## See WARNING below
+
 @name: pack.py
 @desc: Read binary packing.xyzd files, and generate porosity profiles.
 @theory: Cylinder/Sphere intersection volume equations from http://dx.doi.org/10.1016/s1385-7258(61)50049-2
@@ -421,6 +424,10 @@ def main():
     if(args['prune_to_volume']):
         fullBed.prune_to_volume(args['prune_to_volume'], eps=args['eps'])
 
+    ## WARNING: Note the way the column length and radius are calculated,
+    ## As in genmesh, we set a zTop and zBot, and add inlet + outlet to the ends
+    ## In pymesh, however, we define container dimensions directly.
+    ## pymesh/pack-info.py should be more apt for meshes generated via pymesh.
     R = fullBed.R + rCylDelta ## Adding Rcyldelta
     h = (zTop - zBot)*meshScalingFactor  + inlet + outlet
     hBed = fullBed.h
