@@ -170,7 +170,7 @@ do
             exit
             ;;
         -kr|--kill-running)
-            job_ids=$(find .jobs -iname '*.job' -printf "%P" | sed 's/.job/|/g' )
+            job_ids=$(find .jobs -iname '*.job' -printf "%P" | sed 's/.job/|/g' | sed 's/|$//' )
             job_ids=$(squeue -u rao2 -h | grep -P $job_ids 2>/dev/null | awk '{print $1}')
             echo "$job_ids" | xargs scancel
             exit
