@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 ## NOTE: Run this in a mass sim directory. We assume the corresponding flow directory is named similarly in ../../FLOW/$SIM_DIR
 # - Split mesh + data
 # - generate pvtus
@@ -14,36 +16,62 @@
 
 BASE="$PWD"
 NRADS=(1 2 5 10)
-SHELLTYPES=("EQUIDISTANT" "EQUIVOLUME")
-JRUN_COMMAND="jrun"
+# SHELLTYPES=("EQUIDISTANT" "EQUIVOLUME")
+SHELLTYPES=("EQUIDISTANT")
 SIM_DIR=$(basename $(realpath .))
 
-## Split mesh and data
-# WARNING: make sure there are not other sims with the same mass running this in parallel. If so, ensure that the mesh is split already.
-split-mass-mesh-data.sh -m ../mesh -s . -mo ../meshes_split --bulkc --bedc --bedq -fp "${SIM_DIR}_"
-## Run mixd2pvtu generated from above command
-fd mixd2pvtu.b -x ${JRUN_COMMAND} -ne -n -v -c 'srun -n 48 mixd2pvtu {}'
+FLOW_OUTPUT_DIR="output"
+BULK_OUTPUT_DIR="bulk_c"
+BEDC_OUTPUT_DIR="bed_c"
+BEDQ_OUTPUT_DIR="bed_q"
 
-sleep 3
-while [[ -n $(jrun --running) ]]; do
-    sleep 10
-done
+# Remember to add a space before -ve values so that they aren't mistaken for the start of an arg flag
+bed_zmin=
+bed_zmax=
 
-cd "output_bed_c"
-TIME="05:00:00"
-for NRAD in "${NRADS[@]}"; do 
-    for SHELLTYPE in ${SHELLTYPES[@]}; do 
-        ${JRUN_COMMAND} -T ${TIME} --title bedc_${NRAD} -v -c "pvrun radial_shell_integrate --nrad ${NRAD} --shelltype ${SHELLTYPE} --scale 0.75 -o ${SHELLTYPE}_N${NRAD}_FULL_U.DV_SCALED_0.75" -n -ne
-    done 
+RUN_FULL=false
+
+## Default jrun command, no chunking of files for parallel runs
+JRUN_COMMAND=jrun
+OUTPUT_SUFFIX=
+
+# Example case to allow chunking files for parallel jrun execs. 
+# Use this with high NRAD values, else we hit our 24 hour time limit
+# NOTE: Remove echos in actual run.
+# chunk_files.sh -e '*.pvtu' -n 10 -k 3 -c echo jrun -v -ne -n -C pvrun -np 48 radial_shell_integrate --nrad 5 --shelltype EQUIDISTANT -o OUTPUT_{ICHUNK}_FULL_U.DV 
+JRUN_COMMAND="chunk_files.sh -e '*.pvtu' -n 10 -k 3 -C echo jrun"
+OUTPUT_SUFFIX="_{ICHUNK}"
+
+# ## Split mesh and data
+# # WARNING: make sure there are not other sims with the same mass running this in parallel. If so, ensure that the mesh is split already.
+# split-mass-mesh-data.sh -m ../mesh -s . -mo ../meshes_split --bulkc --bedc --bedq -fp "${SIM_DIR}_"
+# ## Run mixd2pvtu generated from above command
+# fd mixd2pvtu.b -x jrun -ne -n -v -c 'srun -n 48 mixd2pvtu {}'
+
+# sleep 3
+# while [[ -n $(jrun --running) ]]; do
+#     sleep 10
+# done
+
+cd "${BEDC_OUTPUT_DIR}" || exit
+TIME="24:00:00"
+for NRAD in "${NRADS[@]}"; do
+    for SHELLTYPE in ${SHELLTYPES[@]}; do
+        if [[ "$RUN_FULL" == "true" ]] ; then
+            ${JRUN_COMMAND} -T ${TIME} --title bedc_${NRAD} -v -n -ne -C pvrun radial_shell_integrate --nrad ${NRAD} --shelltype ${SHELLTYPE} --scale 0.75 -o ${SHELLTYPE}_N${NRAD}_FULL_U.DV_SCALED_0.75${OUTPUT_SUFFIX}
+        fi
+    done
 done
 cd "${BASE}"
 
-cd "output_bed_q"
-TIME="05:00:00"
-for NRAD in "${NRADS[@]}"; do 
-    for SHELLTYPE in ${SHELLTYPES[@]}; do 
-        ${JRUN_COMMAND} -T ${TIME} --title bedq_${NRAD} -v -c "pvrun radial_shell_integrate --nrad ${NRAD} --shelltype ${SHELLTYPE} --scale 0.25 -o ${SHELLTYPE}_N${NRAD}_FULL_U.DV_SCALED_0.25" -n -ne
-    done 
+cd "${BEDQ_OUTPUT_DIR}" || exit
+TIME="24:00:00"
+for NRAD in "${NRADS[@]}"; do
+    for SHELLTYPE in ${SHELLTYPES[@]}; do
+        if [[ "$RUN_FULL" == "true" ]] ; then
+            ${JRUN_COMMAND} -T ${TIME} --title bedq_${NRAD} -v -n -ne -C pvrun radial_shell_integrate --nrad ${NRAD} --shelltype ${SHELLTYPE} --scale 0.25 -o ${SHELLTYPE}_N${NRAD}_FULL_U.DV_SCALED_0.25${OUTPUT_SUFFIX}
+        fi
+    done
 done
 cd "${BASE}"
 
@@ -52,52 +80,63 @@ cd "${BASE}"
 # Only that the reduced order model will now be more (geometrically) accurate when we account for the correct packed bed length.
 # Nonetheless, we generate results here.
 
-## Get bed start and end positions to clip geometry
-cd ../..
-if [[ ! -f "input.yaml_packing_processed.json" ]]; then
-    module load gmsh/4.11.0-2ac03e-copymesh.lua
-    source ~/cjibg12/miniconda3/bin/activate dev
-    pack-info input.yaml
-    source ~/cjibg12/miniconda3/bin/deactivate
-    module unload gmsh/4.11.0-2ac03e-copymesh.lua
-fi
-bed_zmin=$(jq '.post_scale_data.bed_zmin' input.yaml_packing_processed.json | sed 's/-/ -/') ## -ve values should be escaped for the shell
-bed_zmax=$(jq '.post_scale_data.bed_zmax' input.yaml_packing_processed.json)
-cd "$BASE"
+# ## Get bed start and end positions to clip geometry
+# cd ../..
+# if [[ ! -f "input.yaml_packing_processed.json" ]]; then
+#     module load gmsh/4.11.0-2ac03e-copymesh.lua
+#     source ~/cjibg12/miniconda3/bin/activate dev
+#     pack-info input.yaml
+#     source ~/cjibg12/miniconda3/bin/deactivate
+#     module unload gmsh/4.11.0-2ac03e-copymesh.lua
+# fi
+# bed_zmin=$(jq '.post_scale_data.bed_zmin' input.yaml_packing_processed.json | sed 's/-/ -/') ## -ve values should be escaped for the shell
+# bed_zmax=$(jq '.post_scale_data.bed_zmax' input.yaml_packing_processed.json)
+# cd "$BASE"
 
-cd "output_bulk_c"
-TIME="05:00:00"
-for NRAD in "${NRADS[@]}"; do 
-    for SHELLTYPE in ${SHELLTYPES[@]}; do 
-        ${JRUN_COMMAND} -T ${TIME} --title bulk_clip_${NRAD} -v -c "pvrun radial_shell_integrate --project clip twice '${bed_zmin}/${bed_zmax}' 'z#' --nrad ${NRAD} --shelltype ${SHELLTYPE} -o ${SHELLTYPE}_N${NRAD}_CLIPPED_U.DV" -n -ne
-        ${JRUN_COMMAND} -T ${TIME} --title bulk_full_${NRAD} -v -c "pvrun radial_shell_integrate --nrad ${NRAD} --shelltype ${SHELLTYPE} -o ${SHELLTYPE}_N${NRAD}_FULL_U.DV" -n -ne
-    done 
+cd "${BULK_OUTPUT_DIR}" || exit
+TIME="24:00:00"
+for NRAD in "${NRADS[@]}"; do
+    for SHELLTYPE in ${SHELLTYPES[@]}; do
+        if [ -n "${bed_zmin}" ] && [ -n "${bed_zmax}" ]; then
+            ${JRUN_COMMAND} -T ${TIME} --title bulk_clip_${NRAD} -v -n -ne -C pvrun radial_shell_integrate --project clip twice "'${bed_zmin}/${bed_zmax}'" 'z#' --nrad ${NRAD} --shelltype ${SHELLTYPE} -o ${SHELLTYPE}_N${NRAD}_CLIPPED_U.DV${OUTPUT_SUFFIX}
+        fi
+
+        if [[ "$RUN_FULL" == "true" ]] ; then
+            ${JRUN_COMMAND} -T ${TIME} --title bulk_full_${NRAD} -v -n -ne -C pvrun radial_shell_integrate --nrad ${NRAD} --shelltype ${SHELLTYPE} -o ${SHELLTYPE}_N${NRAD}_FULL_U.DV${OUTPUT_SUFFIX}
+        fi
+    done
 done
 cd "$BASE"
 
-cd "../../FLOW/${SIM_DIR}"
+## Generate flow results if not already done
+# cd "../../FLOW/${SIM_DIR}"
+# if [[ -f "mixd2pvtu.in" ]]; then
+#     outpath=$(grep "outpath" mixd2pvtu.in | awk '{print $2}')
+#     outpath=${outpath:-output}
+#     if [ -d "$outpath" ]; then
+#         cd "$outpath"
+#     else
+#         jrun -v -n -ne -C "srun -n 48 mixd2pvtu mixd2pvtu.in"
+#         ## TODO: Wait for jrun to finish
+#         cd "$outpath"
+#     fi
+# else
+#     echo "No mixd2pvtu.in in FLOW dir."
+#     exit -1
+# fi
 
-if [[ -f "mixd2pvtu.in" ]]; then
-    outpath=$(grep "outpath" mixd2pvtu.in | awk '{print $2}')
-    outpath=${outpath:-output}
-    if [ -d "$outpath" ]; then
-        cd "$outpath"
-    else
-        jrun -v -c "srun -n 48 mixd2pvtu mixd2pvtu.in" -ne -n
-        cd "$outpath"
-    fi
-else
-    echo "No mixd2pvtu.in in FLOW dir."
-    exit -1
-fi
-
-TIME="00:10:00"
-for NRAD in "${NRADS[@]}"; do 
-    for SHELLTYPE in ${SHELLTYPES[@]}; do 
-        ${JRUN_COMMAND} -T "${TIME}" --title flow_clip_${NRAD} -v -c "pvrun radial_shell_integrate --project clip twice '${bed_zmin}/${bed_zmax}' 'z#' --nrad ${NRAD} --shelltype ${SHELLTYPE} --divide-by-length -o ${SHELLTYPE}_N${NRAD}_CLIPPED_FLOWRATES" -n -ne
-        ${JRUN_COMMAND} -T "${TIME}" --title flow_full_${NRAD} -v -c "pvrun radial_shell_integrate --nrad ${NRAD} --shelltype ${SHELLTYPE} --divide-by-length -o ${SHELLTYPE}_N${NRAD}_FULL_FLOWRATES" -n -ne
-        ${JRUN_COMMAND} -T "${TIME}" --title por_clip_${NRAD} -v -c "pvrun radial_porosity --project clip twice '${bed_zmin}/${bed_zmax}' 'z#' --nrad ${NRAD} --shelltype ${SHELLTYPE} -o ${SHELLTYPE}_N${NRAD}_CLIPPED" -n -ne
-        ${JRUN_COMMAND} -T "${TIME}" --title por_full_${NRAD} -v -c "pvrun radial_porosity --nrad ${NRAD} --shelltype ${SHELLTYPE} -o ${SHELLTYPE}_N${NRAD}_FULL" -n -ne
+cd "${FLOW_OUTPUT_DIR}" || exit
+TIME="24:00:00"
+for NRAD in "${NRADS[@]}"; do
+    for SHELLTYPE in ${SHELLTYPES[@]}; do
+        if [ -n "${bed_zmin}" ] && [ -n "${bed_zmax}" ]; then
+            ${JRUN_COMMAND} -T ${TIME} --title flow_clip_${NRAD} -v -n -ne -C pvrun radial_shell_integrate --project clip twice "'${bed_zmin}/${bed_zmax}'" 'z#' --nrad ${NRAD} --shelltype ${SHELLTYPE} --divide-by-length -o ${SHELLTYPE}_N${NRAD}_CLIPPED_FLOWRATES${OUTPUT_SUFFIX}
+            ${JRUN_COMMAND} -T ${TIME} --title por_clip_${NRAD} -v -n -ne -C pvrun radial_porosity --project clip twice "'${bed_zmin}/${bed_zmax}'" 'z#' --nrad ${NRAD} --shelltype ${SHELLTYPE} -o ${SHELLTYPE}_N${NRAD}_CLIPPED${OUTPUT_SUFFIX}
+        fi
+        if [[ "$RUN_FULL" == "true" ]] ; then
+            ${JRUN_COMMAND} -T ${TIME} --title flow_full_${NRAD} -v -n -ne -C pvrun radial_shell_integrate --nrad ${NRAD} --shelltype ${SHELLTYPE} --divide-by-length -o ${SHELLTYPE}_N${NRAD}_FULL_FLOWRATES${OUTPUT_SUFFIX}
+            ${JRUN_COMMAND} -T ${TIME} --title por_full_${NRAD} -v -n -ne -C pvrun radial_porosity --nrad ${NRAD} --shelltype ${SHELLTYPE} -o ${SHELLTYPE}_N${NRAD}_FULL${OUTPUT_SUFFIX}
+        fi
     done
 done
 cd "${BASE}"
