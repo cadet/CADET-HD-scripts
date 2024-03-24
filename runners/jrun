@@ -48,54 +48,42 @@ do
     case $key in
         -c|--command)
             COMMAND="$2"
-            shift # past value
-            shift # past value
-            ;;
+            shift; shift ;;
         -C|--command-all)
             COMMAND="${@:2}"
-            shift $#
-            ;;
+            shift $# ;;
         -n|--no-prompt)
             PROMPT=false
-            shift # past value
-            ;;
+            shift ;;
         -ne|--no-edit)
             EDIT=false
-            shift
-            ;;
+            shift ;;
         -l|--last)
             INJOBFILE=$(ls -At .jobs/*.job | head -n1)
-            shift
-            ;;
+            shift ;;
         -ls|--list)
             INJOBFILE=$(ls -At .jobs/*.job | fuzscope)
-            shift
-            ;;
+            shift ;;
         -s|--show)
             less $(ls -At .jobs/* | fuzscope)
-            exit
-            ;;
+            exit ;;
         -t|--tail)
             tail -F $(ls -At .jobs/* | fuzscope)
-            exit
-            ;;
+            exit ;;
         -tr|--tail-running)
             job_ids=$(find .jobs -iname '*.job' -printf "%P" | sed 's/.job/|/g' )
             job_ids=$(squeue -u rao2 -h | grep -P ${job_ids%%|} | awk '{print $1}' | sed 's/^/.jobs\//;s/$/.out/')
             tail -F $job_ids
-            exit
-            ;;
+            exit ;;
         -tre|--tail-running-err)
             job_ids=$(find .jobs -iname '*.job' -printf "%P" | sed 's/.job/|/g' )
             job_ids=$(squeue -u rao2 -h | grep -P ${job_ids%%|} | awk '{print $1}' | sed 's/^/.jobs\//;s/$/.err/')
             tail -F $job_ids
-            exit
-            ;;
+            exit ;;
         -r|--running)
             job_ids=$(find .jobs -iname '*.job' -printf "%P" | sed 's/.job/|/g' )
             squeue -u rao2 -h | grep -P ${job_ids%%|}
-            exit
-            ;;
+            exit ;;
         -iq|--is-queued)
             [[ -n "$2" ]] || exit -1 
             squeue -u rao2 -h | grep "$2"
@@ -105,8 +93,7 @@ do
             tmp=$(ls -At .jobs/*.job | fuzscope)
             jobid=$(basename "${tmp%%.job}")
             sacct -j "$jobid" -o NTasks,AllocCPUS,Elapsed,MaxRSS --units=G
-            exit
-            ;;
+            exit ;;
         -q|--quota)
             tmp=$(ls -At .jobs/*.job | fuzscope)
             jobid=$(basename "${tmp%%.job}")
@@ -118,8 +105,7 @@ do
             echo "JobID: $jobid"
             echo "Core-h: $jobcputime"
             echo "Monthly quota fraction: $monthly_percent%"
-            exit
-            ;;
+            exit ;;
         -qa|--quota-all)
             sum=0
             while IFS= read -r jobfile; do
@@ -134,26 +120,21 @@ do
             monthly_percent=$(( (sum * 100) / monthly ))
             echo "Core-h: $sum"
             echo "Monthly quota fraction: $monthly_percent%"
-            exit
-            ;;
+            exit ;;
         -lo|--show-last-out)
             less $(ls -At .jobs/*.out | head -n1)
-            exit
-            ;;
+            exit ;;
         -lj|--show-last-job)
             less $(ls -At .jobs/*.job | head -n1)
-            exit
-            ;;
+            exit ;;
         -le|--show-last-err)
             less $(ls -At .jobs/*.err | head -n1)
-            exit
-            ;;
+            exit ;;
         -la|--last-account)
             tmp=$(ls -At .jobs/*.job | head -n1)
             jobid=$(basename "${tmp%%.job}")
             sacct -j "$jobid" -o NTasks,AllocCPUS,Elapsed 
-            exit
-            ;;
+            exit ;;
         -kl|--kill-last)
             tmp=$(ls -At .jobs/*.job | head -n1)
             [ -z "$tmp" ] && exit
@@ -162,80 +143,58 @@ do
             read -p $'> \e[31mkill '"$jobid"$'?\e[0m: ' -e -i "$ans" ans
             [ "$ans" != "y" ] && exit
             scancel "$jobid"
-            exit
-            ;;
+            exit ;;
         -ka|--kill-all)
             job_ids=$(squeue -u rao2 -h | awk '{print $1}')
             echo "$job_ids" | xargs scancel
-            exit
-            ;;
+            exit ;;
         -kr|--kill-running)
             job_ids=$(find .jobs -iname '*.job' -printf "%P" | sed 's/.job/|/g' | sed 's/|$//' )
             job_ids=$(squeue -u rao2 -h | grep -P $job_ids 2>/dev/null | awk '{print $1}')
             echo "$job_ids" | xargs scancel
-            exit
-            ;;
+            exit ;;
         -np|--nproc)
             NPROC=$2
-            shift
-            shift
-            ;;
+            shift; shift ;;
         -nt|--ntpn)
             NTPN=$2
-            shift
-            shift
-            ;;
+            shift; shift ;;
         -T|--time)
             TIME=$2
-            shift
-            shift
-            ;;
+            shift; shift ;;
         -d|--dependency)
             DEP_JOB=$2
-            shift
-            shift
-            ;;
+            shift; shift ;;
         -x|--xns)
             MODE="XNS"
-            shift
-            ;;
+            shift ;;
         -X|--xns-bin)
             MODE="XNS"
             XNS_BIN="$2"
-            shift
-            ;;
+            shift; shift ;;
         -v|--vis)
             MODE="VIS"
-            shift
-            ;;
+            shift ;;
         -L22|--load-2022)
             MODE="2022"
-            shift
-            ;;
+            shift ;;
         -L24|--load-2024)
             MODE="2024"
-            shift
-            ;;
+            shift ;;
         --title)
             TITLE="$2"
-            shift
-            shift
-            ;;
+            shift; shift ;;
         -p|--partition)
             PARTITION="$2"
-            shift
-            shift
-            ;;
+            shift; shift ;;
         -h|--help)
             echo "jrun: runscript for JURECA-DC"
             echo "The following args are processed:" 
             grep -Po '\s*-\w+\|[^)]*' "$SCRIPT_PATH"
-            exit
-            ;;
+            exit ;;
         *)    # unknown option
             POSITIONAL+=("$1") # save it in an array for later
-            shift # past argument
-            ;;
+            shift ;;
     esac
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
