@@ -115,6 +115,8 @@ class PackedBed:
         self.rmin = min(radList)
         self.ravg = sum(radList)/len(radList)
 
+        self.bound_zbot = min( bead.z for bead in self.beads )
+
         self.xmax = max(xpr)
         self.ymax = max(ypr)
         self.ymin = min(ymr)
@@ -137,9 +139,11 @@ class PackedBed:
         self.updateBounds()
         offsetx = -(self.xmax + self.xmin)/2
         offsety = -(self.ymax + self.ymin)/2
+        offsetz = -(self.bound_zbot)
         for bead in self.beads:
             bead.x = bead.x + offsetx
             bead.y = bead.y + offsety
+            bead.z = bead.z + offsetz
         self.updateBounds()
 
     def prune_to_volume(self, target_volume:float, eps:float = 1e-3): 
@@ -162,8 +166,10 @@ class PackedBed:
 
         while delta_volume/target_volume > eps: 
 
-            del_zone_beads = list(filter(lambda b: b.z < self.zmin + self.rmax, self.beads)) + list(filter(lambda b: b.z > self.zmax - self.rmax, self.beads)) 
-            print(f"{len(del_zone_beads) = }")
+            ## WARNING: This may not be the same logic used to create meshes
+            # del_zone_beads = list(filter(lambda b: b.z < self.zmin + self.rmax, self.beads)) + list(filter(lambda b: b.z > self.zmax - self.rmax, self.beads)) 
+            print("NOTE: Selecting beads in the end zone only for deletion.")
+            del_zone_beads = list(filter(lambda b: b.z > self.zmax - self.rmax, self.beads)) 
             out = min(del_zone_beads, key=lambda b: abs(b.volume() - delta_volume))
 
             self.beads.remove(out)
