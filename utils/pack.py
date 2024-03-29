@@ -36,6 +36,9 @@ from functools import partial
 import pickle
 import csv
 
+import json
+from pathlib import Path
+
 # NPARTYPE    = 10                   ## NPARTYPE in CADET == number of bins to sort particles by size
 # NRAD = 20                          ## NRAD in CADET == Number of radial shells
 
@@ -438,6 +441,7 @@ def main():
     h = (zTop - zBot)*meshScalingFactor  + inlet + outlet
     hBed = fullBed.h
 
+
     print("xmax = {}, xmin = {}".format(fullBed.xmax, fullBed.xmin))
     print("ymax = {}, ymin = {}".format(fullBed.ymax, fullBed.ymin))
     print("zmax = {}, zmin = {}".format(fullBed.zmax, fullBed.zmin))
@@ -487,6 +491,33 @@ def main():
     print("rmax:", fullBed.rmax)
     print("ravg:", fullBed.ravg)
 
+    assert fullBed.h == fullBed.zmax - fullBed.zmin
+
+    output_data = {}
+    geometry_info = {
+        'column_length': h,
+        'inlet_length': inlet,
+        'outlet_length': outlet,
+        'bed_length': fullBed.h,
+        'bed_length_ratio': fullBed.h / h,
+        'column_radius': R,
+        'bed_radius': fullBed.R,
+        'column_cross_section_area': 0.0,
+        'column_volume': container_volume,
+        'bed_volume': fullBed.volume(),
+        'column_porosity' : 1-(fullBed.volume()/container_volume),
+        'bed_porosity': 1-(fullBed.volume()/container_bedlength_volume),
+        'particle_radius_min': fullBed.rmin,
+        'particle_radius_avg': fullBed.rmax,
+        'particle_radius_max': fullBed.ravg,
+        'column_zmin': zBot*meshScalingFactor - inlet,
+        'column_zmax': zTop*meshScalingFactor + outlet,
+        'bed_zmin': fullBed.zmin,
+        'bed_zmax': fullBed.zmax
+    }
+
+    output_data.update({ 'geometry_info': geometry_info }) 
+
     if args['dry_run']:
         sys.exit(0)
 
@@ -494,7 +525,7 @@ def main():
         writer = csv.writer(f)
         writer.writerows([[bead.r] for bead in fullBed.beads])
 
-    volFrac, bin_radii = histo([bead.r for bead in fullBed.beads], filename=args['output_prefix'] + '_psd', bins=args['npartype'])
+    volFrac1D, bin_radii = histo([bead.r for bead in fullBed.beads], filename=args['output_prefix'] + '_psd', bins=args['npartype'])
 
     # If bins is an int, it defines the number of equal-width bins in the given range
     # (10, by default). If bins is a sequence, it defines a monotonically increasing
@@ -505,7 +536,7 @@ def main():
     _,BINS = np.histogram([bead.r for bead in fullBed.beads], bins=args['npartype'])
 
     print("\n--- Full Bed Histogram ---")
-    print('vol_frac:\n', volFrac,)
+    print('vol_frac:\n', volFrac1D,)
     print('mean_radii:\n', bin_radii)
     print("----\n")
 
@@ -570,6 +601,18 @@ def main():
     print("par_type_volfrac =", volFracs)
     print("par_radius = ", bin_radii)
     print("---\n")
+
+    processed_data = {
+        'par_radius': bin_radii,
+        'bed_porosity': porosities_bed,
+        'column_porosity': porosities_column,
+        'par_type_volfrac_1d': volFrac1D,
+        'part_type_volfrac_2d': volFracs,
+    }
+    output_data.update({'processed_data' : processed_data})
+
+    with open(Path(args['output_prefix'] + '_packing_processed.json'), 'w') as fp: 
+        json.dump(output_data, fp, indent=4)
 
     plotter(avg_shell_radii, porosities_bed, '', args['output_prefix'] + '_bedpor_rad.pdf')
     plotter(avg_shell_radii, porosities_column, '', args['output_prefix'] + '_colpor_rad.pdf')
