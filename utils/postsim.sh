@@ -30,6 +30,7 @@ filter_integer() {
 
 NDF=2
 XNS_CONF_FILE=xns.in
+MESHDIR=
 
 ## Commandline args processing
 POSITIONAL=()
@@ -47,6 +48,9 @@ do
             shift # past value
             shift # past value
             ;;
+        -M|--mesh-dir)
+            MESHDIR= "$2"
+            shift; shift ;;
         *)    # unknown option
             POSITIONAL+=("$1") # save it in an array for later
             shift # past argument
@@ -58,7 +62,9 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 
 # Process and find last executed timestep
 # Extract solution for this timestep into data.in
-MESHDIR=$(findup . -type d -iname "mesh") && [[ -d "$MESHDIR" ]] || die "No mesh dir found!"
+if [ -z "$MESHDIR" ] ; then 
+    MESHDIR=$(findup . -type d -iname "mesh") && [[ -d "$MESHDIR" ]] || die "No mesh dir found!"
+fi
 minffile="$MESHDIR/minf" && [[ -f "$minffile" ]] || die "No minf file found!"
 echo "Using $minffile"
 NN=$(awk '/^nn/{print $2}' "$minffile")
