@@ -493,6 +493,7 @@ def main():
 
     assert fullBed.h == fullBed.zmax - fullBed.zmin
 
+    ## WARNING: after particle deletion for column porosity adjustment, outlet or column length might be wrong
     output_data = {}
     geometry_info = {
         'column_length': h,
@@ -505,11 +506,12 @@ def main():
         'column_cross_section_area': 0.0,
         'column_volume': container_volume,
         'bed_volume': fullBed.volume(),
+        'bed_surface_area': fullBed.surface_area(),
         'column_porosity' : 1-(fullBed.volume()/container_volume),
         'bed_porosity': 1-(fullBed.volume()/container_bedlength_volume),
         'particle_radius_min': fullBed.rmin,
-        'particle_radius_avg': fullBed.rmax,
-        'particle_radius_max': fullBed.ravg,
+        'particle_radius_avg': fullBed.ravg,
+        'particle_radius_max': fullBed.rmax,
         'column_zmin': zBot*meshScalingFactor - inlet,
         'column_zmax': zTop*meshScalingFactor + outlet,
         'bed_zmin': fullBed.zmin,
