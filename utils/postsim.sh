@@ -5,6 +5,8 @@
 #
 # usage: ./postsim.sh -n [ndf:int]
 
+# TODO: Use xns.in to extract mesh dir and other data
+
 function die(){
     echo -e "ERROR: $@" >&2
     exit -1
@@ -49,7 +51,7 @@ do
             shift # past value
             ;;
         -M|--mesh-dir)
-            MESHDIR= "$2"
+            MESHDIR="$2"
             shift; shift ;;
         *)    # unknown option
             POSITIONAL+=("$1") # save it in an array for later
