@@ -233,6 +233,8 @@ mkdir -p "${OUTPUT_MESH_ROOT}/mesh-bulk" "${OUTPUT_MESH_ROOT}/mesh-bed"
 proclaim "Splitting mesh"
 split_mesh
 
+[[ ${#DATA_FILES[@]} -eq 0 ]] && exit
+
 proclaim "Splitting data"
 echo "DATA_FILES: ${DATA_FILES[@]}"
 for DATA_FILE in "${DATA_FILES[@]}"; do 
