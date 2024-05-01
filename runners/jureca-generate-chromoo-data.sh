@@ -7,11 +7,12 @@ function die(){
     exit -1
 }
 
-function ensure_dirs()
+function check_dirs()
 {
     for ARG in "$@"; do
-        [[ -d "$ARG" ]] || die "Dir not found: $ARG"
+        [[ -d "$ARG" ]] || return -1
     done
+    return 0
 }
 
 function get_clip_positions_from_packinfo()
@@ -83,7 +84,7 @@ OUTPUT_SUFFIX="_{ICHUNK}"
 #     sleep 10
 # done
 
-if ensure_dirs "${BEDC_OUTPUT_DIR}" ; then
+if check_dirs "${BEDC_OUTPUT_DIR}" ; then
     cd "${BEDC_OUTPUT_DIR}" || exit
     TIME="24:00:00"
     for NRAD in "${NRADS[@]}"; do
@@ -96,7 +97,7 @@ if ensure_dirs "${BEDC_OUTPUT_DIR}" ; then
     cd "${BASE}"
 fi
 
-if ensure_dirs "${BEDQ_OUTPUT_DIR}" ; then
+if check_dirs "${BEDQ_OUTPUT_DIR}" ; then
     cd "${BEDQ_OUTPUT_DIR}" || exit
     TIME="24:00:00"
     for NRAD in "${NRADS[@]}"; do
@@ -110,7 +111,7 @@ if ensure_dirs "${BEDQ_OUTPUT_DIR}" ; then
 fi
 
 
-if ensure_dirs "${BULK_OUTPUT_DIR}" ; then
+if check_dirs "${BULK_OUTPUT_DIR}" ; then
     cd "${BULK_OUTPUT_DIR}" || exit
     TIME="24:00:00"
     for NRAD in "${NRADS[@]}"; do
@@ -127,7 +128,7 @@ if ensure_dirs "${BULK_OUTPUT_DIR}" ; then
     cd "$BASE"
 fi
 
-# if ensure_dirs "${FLOW_SIM_DIR}" ; then
+# if check_dirs "${FLOW_SIM_DIR}" ; then
 #     # Generate flow results if not already done
 #     cd "${FLOW_SIM_DIR}" || exit
 #     if [[ -f "mixd2pvtu.in" ]]; then
@@ -147,7 +148,7 @@ fi
 #     cd ${BASE}
 # fi
 
-if ensure_dirs "${FLOW_OUTPUT_DIR}" ; then
+if check_dirs "${FLOW_OUTPUT_DIR}" ; then
     cd "${FLOW_OUTPUT_DIR}" || exit
     TIME="24:00:00"
     for NRAD in "${NRADS[@]}"; do
