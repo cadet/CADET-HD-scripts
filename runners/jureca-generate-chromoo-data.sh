@@ -127,25 +127,25 @@ if ensure_dirs "${BULK_OUTPUT_DIR}" ; then
     cd "$BASE"
 fi
 
-if ensure_dirs "${FLOW_SIM_DIR}" ; then
-    # Generate flow results if not already done
-    cd "${FLOW_SIM_DIR}" || exit
-    if [[ -f "mixd2pvtu.in" ]]; then
-        outpath=$(grep "outpath" mixd2pvtu.in | awk '{print $2}')
-        outpath=${outpath:-output}
-        if [ -d "$outpath" ]; then
-            cd "$outpath"
-        else
-            jrun -v -n -ne -C "srun -n 48 mixd2pvtu mixd2pvtu.in"
-            ## TODO: Wait for jrun to finish
-            cd "$outpath"
-        fi
-    else
-        echo "No mixd2pvtu.in in FLOW dir."
-        exit -1
-    fi
-    cd ${BASE}
-fi
+# if ensure_dirs "${FLOW_SIM_DIR}" ; then
+#     # Generate flow results if not already done
+#     cd "${FLOW_SIM_DIR}" || exit
+#     if [[ -f "mixd2pvtu.in" ]]; then
+#         outpath=$(grep "outpath" mixd2pvtu.in | awk '{print $2}')
+#         outpath=${outpath:-output}
+#         if [ -d "$outpath" ]; then
+#             cd "$outpath"
+#         else
+#             jrun -v -n -ne -C "srun -n 48 mixd2pvtu mixd2pvtu.in"
+#             ## TODO: Wait for jrun to finish
+#             cd "$outpath"
+#         fi
+#     else
+#         echo "No mixd2pvtu.in in FLOW dir."
+#         exit -1
+#     fi
+#     cd ${BASE}
+# fi
 
 if ensure_dirs "${FLOW_OUTPUT_DIR}" ; then
     cd "${FLOW_OUTPUT_DIR}" || exit
