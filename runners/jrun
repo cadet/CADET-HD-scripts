@@ -271,6 +271,7 @@ fi
 
 if [[ "$MODE" == "GMSH" ]]; then
 read -r -d '' CMDS << EOFMARKER
+module load Stages/2022 GCC/11.2.0 ParaStationMPI/5.5.0-1 ParMETIS/4.0.3-double Boost/1.78.0 VTK/9.1.0 flex/2.6.4
 module load gmsh/4.11.0-2ac03e-copymesh.lua
 source ~/cjibg12/miniconda3/bin/activate dev 
 EOFMARKER
