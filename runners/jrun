@@ -184,6 +184,9 @@ do
         --conda-dev)
             MODE="CONDA_DEV"
             shift ;;
+        --gmsh)
+            MODE="GMSH"
+            shift ;;
         --title)
             TITLE="$2"
             shift; shift ;;
@@ -263,6 +266,13 @@ fi
 if [[ $MODE == "CONDA_DEV" ]]; then
 read -r -d '' CMDS << EOFMARKER
 source ~/cjibg12/miniconda3/bin/activate dev
+EOFMARKER
+fi
+
+if [[ "$MODE" == "GMSH" ]]; then
+read -r -d '' CMDS << EOFMARKER
+module load gmsh/4.11.0-2ac03e-copymesh.lua
+source ~/cjibg12/miniconda3/bin/activate dev 
 EOFMARKER
 fi
 
