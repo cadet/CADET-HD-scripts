@@ -267,18 +267,16 @@ def histo(radii, **kwargs):
     w=2
     avg=np.convolve(e, np.ones(w), 'valid') / w
 
-    if filename:
-        with plt.style.context(['science']):
-            # matplotlib.rcParams['font.sans-serif'] = "Verdana"
-            # matplotlib.rcParams['font.family'] = "sans-serif"
-
-            fig, ax = plt.subplots()
-            ax.hist(radii, bins=bins)
-
-            # ax.set(title=filename)
-            ax.set_xlabel('Bead Radius ($m$)')
-            ax.set(ylabel='Frequency')
-            fig.savefig(filename + '.pdf')
+    # if filename:
+    #     with plt.style.context(['science']):
+    #         # matplotlib.rcParams['font.sans-serif'] = "Verdana"
+    #         # matplotlib.rcParams['font.family'] = "sans-serif"
+    #         fig, ax = plt.subplots()
+    #         ax.hist(radii, bins=bins)
+    #         # ax.set(title=filename)
+    #         ax.set_xlabel('Bead Radius ($m$)')
+    #         ax.set(ylabel='Frequency')
+    #         fig.savefig(filename + '.pdf')
 
     return frac, list(avg)
 
@@ -527,20 +525,17 @@ def main():
         writer = csv.writer(f)
         writer.writerows([[bead.r] for bead in fullBed.beads])
 
-    volFrac1D, bin_radii = histo([bead.r for bead in fullBed.beads], filename=args['output_prefix'] + '_psd', bins=args['npartype'])
+    par_radii_all = [ b.r for b in fullBed.beads ] 
+    par_volumes_all = [ b.volume() for b in fullBed.beads ]
 
-    # If bins is an int, it defines the number of equal-width bins in the given range
-    # (10, by default). If bins is a sequence, it defines a monotonically increasing
-    # array of bin edges, including the rightmost edge, allowing for non-uniform bin widths.
-
-    # Generate BINS, based on all the beads in the whole column. This will be used later
-    # to categorize beads within shells into the same BINS
-    _,BINS = np.histogram([bead.r for bead in fullBed.beads], bins=args['npartype'])
-
-    print("\n--- Full Bed Histogram ---")
-    print('vol_frac:\n', volFrac1D,)
-    print('mean_radii:\n', bin_radii)
-    print("----\n")
+    ## Dump into bins by weight of each bead's volume
+    ## h (height of histogram bar) is then a representation of
+    ## the volume of beads present at a certain radius (partype).
+    ## if density==true weights are normalized
+    volumes, bin_edges = np.histogram(par_radii_all, bins=args['npartype'], weights=par_volumes_all)
+    volume_fractions=[x/sum(volumes) for x in volumes]
+    ## Find means of each bin from the edges
+    bin_mean_radii = list(np.convolve(bin_edges, np.ones(2), 'valid') / 2)
 
     nRegions = args['nrad']
     nShells = nRegions + 1 #Including r = 0
@@ -565,7 +560,7 @@ def main():
     pool = Pool()
     parfunc = partial(volShellRegion, fullBed.beads, rShells)
     # volRegions = pool.map(parfunc, range(nRegions))
-    total_beads_volume_per_shell, radii_beads_per_shell = zip(*pool.map(parfunc, range(nRegions)))
+    total_beads_volume_per_shell, radii_beads_per_shell, volumes_beads_per_shell = zip(*pool.map(parfunc, range(nRegions)))
     pool.close()
     pool.join()
 
@@ -573,6 +568,7 @@ def main():
 
     total_beads_volume_per_shell = np.array(total_beads_volume_per_shell).astype(np.float64)
     radii_beads_per_shell = [ np.array(item).astype(np.float64) for item in radii_beads_per_shell ]
+    volumes_beads_per_shell = [ np.array(item).astype(np.float64) for item in volumes_beads_per_shell ]
 
     volCylRegions_bed = [pi * hBed * (rShells[i+1]**2 - rShells[i]**2) for i in range(nRegions)]
     volCylRegions_column = [pi * h * (rShells[i+1]**2 - rShells[i]**2) for i in range(nRegions)]
@@ -591,27 +587,25 @@ def main():
     print("---\n")
 
     ## Get histogram data: volume fractions and radii, for each shell
-    ## bin_radii is the list of mean bin radii for each shell, which is set to BINS
+    ## bin_radii is the list of mean bin radii for each shell, which is set to bin_edges
     volFracs = []
-    for rads in radii_beads_per_shell:
-        volFrac, bin_radii = histo([float(x) for x in rads], bins=BINS)
+    for rads,vols in zip(radii_beads_per_shell, volumes_beads_per_shell): # For every zone
+        ## NOTE: Old code, assumes split regions of particles across rShells as SMALLER particles
+        # vols = [4*np.pi*x*x*x/3 for x in rads] 
+        # New code uses the volumes output by volShellRegion
+        volumes, bin_edges = np.histogram([float(x) for x in rads], bins=bin_edges, weights=vols) 
+        volFrac=[x/sum(volumes) for x in volumes]
         volFracs.extend(volFrac)
 
-    print("\n--- Particle Distribution per Shell ---")
-    print("vol_frac length (NRAD * NPARTYPE) =", len(volFracs))
-    print("avg_radii length (NPARTYPE) =", len(bin_radii))
-    print("par_type_volfrac =", volFracs)
-    print("par_radius = ", bin_radii)
-    print("---\n")
-
-    processed_data = {
-        'par_radius': bin_radii,
+    data = {
+        'par_radius': bin_mean_radii,
         'bed_porosity': porosities_bed,
         'column_porosity': porosities_column,
-        'par_type_volfrac_1d': volFrac1D,
+        'par_type_volfrac_1d': volume_fractions,
         'part_type_volfrac_2d': volFracs,
     }
-    output_data.update({'processed_data' : processed_data})
+
+    output_data.update({'processed_data' : data})
 
     with open(Path(args['output_prefix'] + '_packing_processed.json'), 'w') as fp: 
         json.dump(output_data, fp, indent=4)
@@ -633,13 +627,23 @@ def volShellRegion(beads, rShells, i):
     """
     volShell=0
     radsShell=[]
+    volBeads=[]
     for bead in beads:
         volBead = volBeadSlice(bead, rShells[i], rShells[i+1])
         volShell = volShell + volBead
-        radBead = pow(volBead/(4.0/3.0*pi), 1.0/3.0)
-        if radBead != 0:
+
+        ## Previously used. Considers split regions as independent SMALLER particles 
+        ## Assumes particle radii are smaller than radial zone sizes
+        # radBead = pow(volBead/(4.0/3.0*pi), 1.0/3.0)
+
+        # New code, uses exact radius in conjunction with split particle volumes, which can then be used as weights in the histogram to generate volume fractions
+        # WARNING: this way, particles can be larger than radial zone sizes.
+        radBead = bead.r
+
+        if volBead != 0:
             radsShell.append(radBead)
-    return volShell, radsShell
+            volBeads.append(volBead)
+    return volShell, radsShell, volBeads
 
 # def radsShellRegion(beads, rShells, i):
 #     """
@@ -704,16 +708,18 @@ def volBeadSlice(bead, rInnerShell, rOuterShell):
     return volIntBead
 
 def plotter(x, y, title, filename):
-    with plt.style.context(['science']):
-        fig, ax = plt.subplots()
-        ax.plot(x, y)
-        # legend = ax.legend(loc='best', shadow=True)
-        ax.set(title=title)
-        ax.set(xlabel='Radius')
-        ax.set(ylabel='Porosity')
-        ax.autoscale(tight=True)
-        ax.set_ylim(0,1)
-        fig.savefig(filename)
+    pass
+
+    # with plt.style.context(['science']):
+    #     fig, ax = plt.subplots()
+    #     ax.plot(x, y)
+    #     # legend = ax.legend(loc='best', shadow=True)
+    #     ax.set(title=title)
+    #     ax.set(xlabel='Radius')
+    #     ax.set(ylabel='Porosity')
+    #     ax.autoscale(tight=True)
+    #     ax.set_ylim(0,1)
+    #     fig.savefig(filename)
 
 
 if __name__ == "__main__":
