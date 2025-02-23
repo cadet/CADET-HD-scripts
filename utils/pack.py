@@ -537,6 +537,8 @@ def main():
     ## Find means of each bin from the edges
     bin_mean_radii = list(np.convolve(bin_edges, np.ones(2), 'valid') / 2)
 
+    np.savetxt('bin_edges.txt', bin_edges)
+
     nRegions = args['nrad']
     nShells = nRegions + 1 #Including r = 0
     rShells = []
@@ -589,10 +591,11 @@ def main():
     ## Get histogram data: volume fractions and radii, for each shell
     ## bin_radii is the list of mean bin radii for each shell, which is set to bin_edges
     volFracs = []
-    for rads,vols in zip(radii_beads_per_shell, volumes_beads_per_shell): # For every zone
+    for i,(rads,vols) in enumerate(zip(radii_beads_per_shell, volumes_beads_per_shell)): # For every zone
         ## NOTE: Old code, assumes split regions of particles across rShells as SMALLER particles
         # vols = [4*np.pi*x*x*x/3 for x in rads] 
         # New code uses the volumes output by volShellRegion
+        np.savetxt(f'shell_{i}_rad_vol.txt', np.stack([rads,vols], axis=1), delimiter=',', header='radii,volumes')
         volumes, bin_edges = np.histogram([float(x) for x in rads], bins=bin_edges, weights=vols) 
         volFrac=[x/sum(volumes) for x in volumes]
         volFracs.extend(volFrac)
