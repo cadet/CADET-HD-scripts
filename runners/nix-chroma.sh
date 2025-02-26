@@ -481,8 +481,7 @@ ETYPE=tet && NEN=4 && MESH_ORDER=1
 PERIODICITY=
 LEGACY_GMSH2MIXD=0
 
-SOFTWARE_STAGE=2022
-
+SOFTWARE_STAGE=2023
 
 ## Commandline args processing
 POSITIONAL=()
@@ -583,6 +582,9 @@ if [[ $(hostname) =~ (jureca|jrc.*) ]]; then
         ## Unfortunately, on JURECA, ParMETIS-double is only available on 2022 stage
         ## So we use this as the default
         module load Stages/2022 GCC/11.2.0 ParaStationMPI/5.5.0-1 ParMETIS/4.0.3-double Boost/1.78.0 VTK/9.1.0 flex/2.6.4  
+    elif [[ "$SOFTWARE_STAGE" == 2023 ]]; then
+        echo "WARNING: ParMETIS is compiled with only single-precision support!"
+        module load Stages/2023 GCC/11.3.0 ParaStationMPI/5.8.1-1 ParMETIS/4.0.3 Boost/1.79.0 flex/2.6.4 imkl/2022.1.0 VTK/9.2.5
 
     elif [[ "$SOFTWARE_STAGE" == 2024 ]]; then
         module load Stages/2024 GCC/12.3.0 ParaStationMPI/5.9.2-1 ParMETIS/4.0.3 Boost/1.82.0 VTK/9.3.0 flex/2.6.4
