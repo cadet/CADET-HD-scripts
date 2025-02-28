@@ -55,7 +55,15 @@ BULK_OUTPUT_DIR="bulk_c"
 BEDC_OUTPUT_DIR="bed_c"
 BEDQ_OUTPUT_DIR="bed_q"
 
-# Remember to add a space before -ve values so that they aren't mistaken for the start of an arg flag
+# Use chromoo/bin/pack-info to calculate bed_zmin and bed_zmax (NOTE that this
+# assumes everything was set up as pack-info expects) This is particularly
+# important in polydisperse meshes where we do some packed-bed manipulation to
+# remove particles. We've done it differently in different meshes/packings that
+# were generated on previous versions of pymesh/genmesh.
+# OR
+# `paravision/bin/pvrun mesh_info bed_c_0.pvtu` to calculate the bounding box
+# of the packed-bed-only mesh, which reflects correct values taken from simulated meshes
+# NOTE: Remember to add a space before -ve values so that they aren't mistaken for the start of an arg flag
 bed_zmin=
 bed_zmax=
 
