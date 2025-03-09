@@ -3,6 +3,10 @@
 ## Use the following shebang to run the script under a nix develop shell
 #!/usr/bin/env -S nix develop --impure /home/jayghoshter/dev/tools/pymesh/flake.nix --command zsh
 
+## Usage example on JURECA:
+# nix-chroma.sh -nt 48 -n 1920 -dp 'srun -A jibg12 -N3 --ntasks-per-node 64' flow -s sim_stab_1.0 --decompose --legacy-gmsh2mixd
+
+
 filter_integer() {
     if [[ $1 =~ ^[[:digit:]]+$ ]]; then
         echo "$1"
@@ -592,7 +596,8 @@ if [[ $(hostname) =~ (jureca|jrc.*) ]]; then
 
     # for pymesh
     module load gmsh/4.11.0-2ac03e-copymesh.lua
-    source ~/cjibg12/miniconda3/bin/activate dev 
+    source /p/project/cjibg12/dev/tools/pymesh/.venv/bin/activate
+    # source ~/cjibg12/miniconda3/bin/activate dev 
 fi
 
 if [[ -n "$DISPATCH_PREFIX" ]]; then
