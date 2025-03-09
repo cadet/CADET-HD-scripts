@@ -575,7 +575,7 @@ echo "Dispatch prefix: $DISPATCH_PREFIX"
 echo "Remote: $REMOTE"
 
 if [[ $(hostname) =~ (jureca|jrc.*) ]]; then 
-    source /p/software/jurecadc/lmod/8.4.1/init/zsh
+    source /p/software/jurecadc/lmod/8.7.49/init/zsh
     export MODULEPATH=/p/project/cjibg12/modulefiles:/p/software/jurecadc/supercomputer_modules:/p/software/jurecadc/productionstages
 
     if [[ "$SOFTWARE_STAGE" == 2022 ]]; then
